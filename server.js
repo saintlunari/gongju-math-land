@@ -3,6 +3,10 @@ const http = require('http');
 const { Server } = require('socket.io');
 const os = require('os');
 const QRCode = require('qrcode');
+const { validateQuestionBank, getQuestionsForRegion } = require('./question_bank');
+
+// 서버 시작 시 문제 은행 100% 무결성 검증 (불변식 검사)
+validateQuestionBank();
 
 const app = express();
 const server = http.createServer(app);
@@ -30,7 +34,7 @@ function getLocalIpAddress() {
 
 const localIp = getLocalIpAddress();
 
-// 공주시 33개 영토 정의 (유구읍 18개 법정리 + 15개 읍·면·동 실제 행정구역)
+// 공주시 150개 영토 정의 (16개 읍·면·동 전역의 모든 법정동 및 법정리)
 const INITIAL_REGIONS = require('./public/data/server_initial_regions.json');
 
 // 게임 상태
@@ -74,220 +78,9 @@ function resetRegions() {
 }
 resetRegions();
 
-// 퀴즈 문제 생성기 (초등 2학년 2학기 7대 곱셈 기초 개념)
-function generateQuiz(settings, count = 5) {
-  const quizzes = [];
-  
-  // 단원 범위 결정 (2학년 2학기 구구단)
-  let danList = [2, 3, 4, 5, 6, 7, 8, 9];
-  if (settings.danRange === '2to5') danList = [2, 3, 4, 5];
-  else if (settings.danRange === '6to9') danList = [6, 7, 8, 9];
-
-  // 초등 2학년 곱셈 7대 핵심 개념 유형 (선생님 모드 선택 반영)
-  let types = [
-    'skip_count',                 // 1. 몇씩 뛰어 세기
-    'group_count',                // 2. 묶어 세기
-    'count_one_by_one',           // 3. 하나씩 세어 보기
-    'groups_of',                  // 4. 몇씩 몇 묶음
-    'times_of',                   // 5. 몇의 몇 배
-    'addition_to_multiplication', // 6. 덧셈식을 곱셈식으로
-    'times_to_multiplication'     // 7. 몇의 몇 배를 곱셈식으로
-  ];
-
-  if (settings.conceptMode === 'visual') {
-    types = ['skip_count', 'group_count', 'count_one_by_one'];
-  } else if (settings.conceptMode === 'concept') {
-    types = ['groups_of', 'times_of'];
-  } else if (settings.conceptMode === 'formula') {
-    types = ['addition_to_multiplication', 'times_to_multiplication'];
-  }
-
-  const fruits = [
-    { name: '공주 알밤', icon: '🌰' },
-    { name: '우성 멜론', icon: '🍈' },
-    { name: '빨간 사과', icon: '🍎' },
-    { name: '도토리', icon: '🐿️' },
-    { name: '새콤 딸기', icon: '🍓' },
-    { name: '달콤 감', icon: '🍊' }
-  ];
-
-  for (let i = 0; i < count; i++) {
-    const dan = danList[Math.floor(Math.random() * danList.length)];
-    // 초등 2학년 수준을 고려해 뛰어세기/하나씩세기는 곱하는 수를 2~6 위주로 조절
-    const num = Math.floor(Math.random() * 8) + 2; // 2 ~ 9
-    const ans = dan * num;
-    const fruit = fruits[Math.floor(Math.random() * fruits.length)];
-
-    // 순환 또는 랜덤 유형 선택
-    const chosenType = types[i % types.length];
-
-    let title = '';
-    let subTitle = '';
-    let formula = '';
-    let answer = ans;
-    let category = '';
-    let visual = ''; // 시각화 이모지/다이어그램
-
-    switch (chosenType) {
-      // 1. 몇씩 뛰어 세기
-      case 'skip_count': {
-        category = '🦘 몇씩 뛰어 세기';
-        title = `${dan}씩 ${num}번 뛰어 세어 볼까요?`;
-        
-        // 시각화: 3 ➔ 6 ➔ 9 ➔ [ ? ]
-        const steps = [];
-        for (let s = 1; s <= num; s++) {
-          if (s === num) steps.push('❓');
-          else steps.push(dan * s);
-        }
-        visual = steps.join(' ➔ ');
-        subTitle = `뛰어 센 마지막 빈칸(❓)에 들어갈 수는?`;
-        formula = `${dan}씩 ${num}번 뛰어 센 수 = ?`;
-        answer = ans;
-        break;
-      }
-
-      // 2. 묶어 세기
-      case 'group_count': {
-        category = '📦 묶어 세기';
-        title = `${fruit.name}을/를 ${dan}개씩 묶어 세어 보세요.`;
-        
-        // 시각화: (🌰🌰) (🌰🌰) (🌰🌰)
-        const groupVisual = [];
-        const itemIcons = Array(Math.min(dan, 5)).fill(fruit.icon).join('');
-        for (let g = 0; g < Math.min(num, 5); g++) {
-          groupVisual.push(`[${itemIcons}]`);
-        }
-        visual = groupVisual.join(' ');
-        subTitle = `${dan}씩 묶어 센 전체 개수는 얼마일까요?`;
-        formula = `${dan}씩 ${num}묶음 = ?`;
-        answer = ans;
-        break;
-      }
-
-      // 3. 하나씩 세어 보기
-      case 'count_one_by_one': {
-        category = '👆 하나씩 세어 보기';
-        title = `${fruit.name}을/를 하나씩 세어보면 모두 몇 개일까요?`;
-        
-        // 시각화: 바둑판처럼 나열
-        const rows = [];
-        const rowIcons = Array(dan).fill(fruit.icon).join('');
-        for (let r = 0; r < Math.min(num, 4); r++) {
-          rows.push(rowIcons);
-        }
-        visual = rows.join('  /  ');
-        subTitle = `하나씩 세어 보면 번거롭지만 곱셈으로 풀면 쉬워요! (${dan}개씩 ${num}줄)`;
-        formula = `하나씩 센 전체 개수 = ?`;
-        answer = ans;
-        break;
-      }
-
-      // 4. 몇씩 몇 묶음
-      case 'groups_of': {
-        category = '🎁 몇씩 몇 묶음';
-        title = `${fruit.name}이/가 ${dan}개씩 ${num}묶음 있습니다.`;
-        visual = `${fruit.icon} ${dan}개씩 × ${num}묶음`;
-        subTitle = '모두 몇 개인지 구해보세요.';
-        formula = `${dan}개씩 ${num}묶음 = ?`;
-        answer = ans;
-        break;
-      }
-
-      // 5. 몇의 몇 배
-      case 'times_of': {
-        category = '🌱 몇의 몇 배';
-        title = `${dan}의 ${num}배는 얼마일까요?`;
-        visual = `${dan}을 ${num}번 더한 크기`;
-        subTitle = `${dan}의 ${num}배의 값을 계산해 보세요.`;
-        formula = `${dan}의 ${num}배 = ?`;
-        answer = ans;
-        break;
-      }
-
-      // 6. 덧셈식을 곱셈식으로
-      case 'addition_to_multiplication': {
-        category = '➕ 덧셈식을 곱셈식으로';
-        const addArr = Array(num).fill(dan);
-        const addExpr = addArr.join(' + ');
-
-        if (Math.random() < 0.5) {
-          title = `덧셈식을 곱셈식으로 나타내어 보세요.`;
-          subTitle = `□ 안에 들어갈 알맞은 수는 무엇일까요?`;
-          visual = addExpr;
-          formula = `${addExpr} = ${dan} × □`;
-          answer = num; // 곱하는 수
-        } else {
-          title = `같은 수를 여러 번 더한 값을 곱셈으로 풀어보세요.`;
-          subTitle = `${dan}을 ${num}번 더한 값은?`;
-          visual = addExpr;
-          formula = `${dan} × ${num} = ?`;
-          answer = ans;
-        }
-        break;
-      }
-
-      // 7. 몇의 몇 배를 곱셈식으로
-      case 'times_to_multiplication': {
-        category = '✨ 몇의 몇 배를 곱셈식으로';
-        if (Math.random() < 0.5) {
-          title = `'${dan}의 ${num}배'를 곱셈식으로 나타내어 보세요.`;
-          subTitle = `□ 안에 들어갈 알맞은 수는 무엇일까요?`;
-          visual = `${dan}의 ${num}배 = ${dan} × □`;
-          formula = `${dan}의 ${num}배 = ${dan} × □`;
-          answer = num;
-        } else {
-          title = `'${dan}의 ${num}배'를 곱셈식으로 쓰고 계산해 보세요.`;
-          subTitle = `${dan}의 ${num}배 = ${dan} × ${num}`;
-          visual = `${dan}의 ${num}배 = ${dan} × ${num} = ?`;
-          formula = `${dan} × ${num} = ?`;
-          answer = ans;
-        }
-        break;
-      }
-    }
-
-    quizzes.push(createQuizObj(formula, answer, category, title, subTitle, visual));
-  }
-
-  return quizzes;
-}
-
-// 퀴즈 객체 및 4지선다 보기 생성
-function createQuizObj(formula, answer, category, title, subTitle = '', visual = '') {
-  // 오답 보기 3개 생성 (근접한 값 및 구구단 구구값 위주)
-  const optionsSet = new Set([answer]);
-  const candidates = [
-    answer - 1, answer + 1, answer - 2, answer + 2,
-    answer - 10, answer + 10, answer + 5, answer - 5,
-    (answer > 10 ? answer - 4 : answer + 6),
-    answer + 3, answer - 3
-  ];
-
-  for (const c of candidates) {
-    if (c > 0 && c !== answer && optionsSet.size < 4) {
-      optionsSet.add(c);
-    }
-  }
-
-  // 여전히 부족하면 랜덤 채우기
-  while (optionsSet.size < 4) {
-    const r = Math.max(1, answer + Math.floor(Math.random() * 15) - 7);
-    optionsSet.add(r);
-  }
-
-  // 셔플
-  const options = Array.from(optionsSet).sort(() => Math.random() - 0.5);
-
-  return {
-    formula,
-    answer,
-    category,
-    title,
-    subTitle,
-    visual,
-    options
-  };
+// 퀴즈 문제 출제: 초등 2학년 2학기 7대 개념 검증 문제 은행에서 지역별 무작위 추출
+function generateQuiz(settings, count = 5, regionId = '') {
+  return getQuestionsForRegion(settings, count, regionId);
 }
 
 // 타이머 인터벌
@@ -434,7 +227,7 @@ io.on('connection', (socket) => {
       ? gameState.settings.questionsPerDefense 
       : gameState.settings.questionsPerConquer;
 
-    const quizzes = generateQuiz(gameState.settings, count);
+    const quizzes = generateQuiz(gameState.settings, count, regionId);
 
     socket.emit('receive_quiz', {
       regionId,

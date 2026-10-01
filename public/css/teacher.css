@@ -191,6 +191,39 @@ body {
   stroke: #64748B;
 }
 
+#teacher-map-container .all-ri-path {
+  stroke: #475569;
+  stroke-width: 1.0px;
+}
+
+#teacher-map-container .all-ri-node:hover .all-ri-path {
+  stroke: #38BDF8;
+  stroke-width: 2.5px;
+}
+
+#teacher-map-container .all-ri-node .avatar-badge-icon {
+  font-size: 9px !important;
+}
+
+#teacher-map-container .all-ri-node .all-ri-name {
+  font-size: 8.5px !important;
+  font-weight: 800;
+  fill: #FFFFFF;
+  paint-order: stroke fill;
+  stroke: #0F172A;
+  stroke-width: 2.2px;
+  stroke-linejoin: round;
+  letter-spacing: -0.3px;
+}
+
+#teacher-map-container .all-ri-node .owner-pill-text {
+  font-size: 6.5px !important;
+}
+
+#teacher-map-container .all-ri-node .shield-badge-text {
+  font-size: 6.5px !important;
+}
+
 /* 우측 사이드바 */
 .sidebar-panel {
   display: flex;
