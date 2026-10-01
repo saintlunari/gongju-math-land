@@ -1,0 +1,612 @@
+[
+  {
+    "id": "yugu_mungeum",
+    "name": "문금리",
+    "town": "유구읍",
+    "type": "리",
+    "tag": "봉수산명상길",
+    "icon": "🏔️",
+    "cx": 346.4,
+    "cy": 90.6
+  },
+  {
+    "id": "yugu_donghae",
+    "name": "동해리",
+    "town": "유구읍",
+    "type": "리",
+    "tag": "청정솔향",
+    "icon": "🌲",
+    "cx": 371.7,
+    "cy": 131.9
+  },
+  {
+    "id": "yugu_myeonggok",
+    "name": "명곡리",
+    "town": "유구읍",
+    "type": "리",
+    "tag": "반딧불이골",
+    "icon": "✨",
+    "cx": 426.8,
+    "cy": 130.7
+  },
+  {
+    "id": "yugu_deokgok",
+    "name": "덕곡리",
+    "town": "유구읍",
+    "type": "리",
+    "tag": "덕곡산골",
+    "icon": "🏡",
+    "cx": 326.3,
+    "cy": 153
+  },
+  {
+    "id": "yugu_sedong",
+    "name": "세동리",
+    "town": "유구읍",
+    "type": "리",
+    "tag": "도예옹기",
+    "icon": "🏺",
+    "cx": 295.5,
+    "cy": 195.3
+  },
+  {
+    "id": "yugu_topgok",
+    "name": "탑곡리",
+    "town": "유구읍",
+    "type": "리",
+    "tag": "삼층석탑",
+    "icon": "🗿",
+    "cx": 407,
+    "cy": 176.4
+  },
+  {
+    "id": "yugu_chugye",
+    "name": "추계리",
+    "town": "유구읍",
+    "type": "리",
+    "tag": "가을단풍길",
+    "icon": "🍁",
+    "cx": 443.4,
+    "cy": 201.9
+  },
+  {
+    "id": "yugu_seongnam",
+    "name": "석남리",
+    "town": "유구읍",
+    "type": "리",
+    "tag": "읍행정복지센터",
+    "icon": "🧵",
+    "cx": 325.4,
+    "cy": 207.8
+  },
+  {
+    "id": "yugu_yuguri",
+    "name": "유구리",
+    "town": "유구읍",
+    "type": "리",
+    "tag": "수국생태원",
+    "icon": "🌸",
+    "cx": 373.2,
+    "cy": 224.7
+  },
+  {
+    "id": "yugu_ipseok",
+    "name": "입석리",
+    "town": "유구읍",
+    "type": "리",
+    "tag": "선돌바위",
+    "icon": "🪨",
+    "cx": 278.4,
+    "cy": 260.1
+  },
+  {
+    "id": "yugu_gugye",
+    "name": "구계리",
+    "town": "유구읍",
+    "type": "리",
+    "tag": "아홉골짜기",
+    "icon": "💧",
+    "cx": 411.3,
+    "cy": 243
+  },
+  {
+    "id": "yugu_baekgyo",
+    "name": "백교리",
+    "town": "유구읍",
+    "type": "리",
+    "tag": "흰다리마을",
+    "icon": "🌉",
+    "cx": 335.7,
+    "cy": 273.5
+  },
+  {
+    "id": "yugu_sindal",
+    "name": "신달리",
+    "town": "유구읍",
+    "type": "리",
+    "tag": "달빛고을",
+    "icon": "🌙",
+    "cx": 284.9,
+    "cy": 297.4
+  },
+  {
+    "id": "yugu_yeonjong",
+    "name": "연종리",
+    "town": "유구읍",
+    "type": "리",
+    "tag": "연꽃종소리",
+    "icon": "🔔",
+    "cx": 379.3,
+    "cy": 282.7
+  },
+  {
+    "id": "yugu_nokcheon",
+    "name": "녹천리",
+    "town": "유구읍",
+    "type": "리",
+    "tag": "푸른시냇물",
+    "icon": "🌿",
+    "cx": 282.8,
+    "cy": 337.8
+  },
+  {
+    "id": "yugu_sinyeong",
+    "name": "신영리",
+    "town": "유구읍",
+    "type": "리",
+    "tag": "황금들판",
+    "icon": "🌾",
+    "cx": 340.2,
+    "cy": 332.3
+  },
+  {
+    "id": "yugu_nodong",
+    "name": "노동리",
+    "town": "유구읍",
+    "type": "리",
+    "tag": "갈대숲마을",
+    "icon": "🍃",
+    "cx": 341.7,
+    "cy": 361.4
+  },
+  {
+    "id": "yugu_mancheon",
+    "name": "만천리",
+    "town": "유구읍",
+    "type": "리",
+    "tag": "만복시내",
+    "icon": "🍀",
+    "cx": 375.1,
+    "cy": 323.3
+  },
+  {
+    "id": "jeongan_gwangjeong",
+    "name": "광정리",
+    "town": "정안면",
+    "type": "리",
+    "tag": "정안면사무소",
+    "icon": "🌰",
+    "cx": 614.4,
+    "cy": 184.2
+  },
+  {
+    "id": "jeongan_eomul",
+    "name": "어물리",
+    "town": "정안면",
+    "type": "리",
+    "tag": "연꽃생태원",
+    "icon": "🪷",
+    "cx": 573.1,
+    "cy": 301.5
+  },
+  {
+    "id": "jeongan_pyeongjeong",
+    "name": "평정리",
+    "town": "정안면",
+    "type": "리",
+    "tag": "알밤특구",
+    "icon": "🌰",
+    "cx": 656,
+    "cy": 212.3
+  },
+  {
+    "id": "jeongan_sahyeon",
+    "name": "사현리",
+    "town": "정안면",
+    "type": "리",
+    "tag": "모란마을",
+    "icon": "🌸",
+    "cx": 509,
+    "cy": 171.6
+  },
+  {
+    "id": "jeongan_seoksong",
+    "name": "석송리",
+    "town": "정안면",
+    "type": "리",
+    "tag": "석송유적",
+    "icon": "🚩",
+    "cx": 636.1,
+    "cy": 287.5
+  },
+  {
+    "id": "jeongan_inpung",
+    "name": "인풍리",
+    "town": "정안면",
+    "type": "리",
+    "tag": "차령고개",
+    "icon": "🏔️",
+    "cx": 581.7,
+    "cy": 131.8
+  },
+  {
+    "id": "sagok_unam",
+    "name": "운암리",
+    "town": "사곡면",
+    "type": "리",
+    "tag": "천년마곡사",
+    "icon": "🏯",
+    "cx": 464.7,
+    "cy": 288.7
+  },
+  {
+    "id": "sagok_hogye",
+    "name": "호계리",
+    "town": "사곡면",
+    "type": "리",
+    "tag": "사곡면사무소",
+    "icon": "🍃",
+    "cx": 487.9,
+    "cy": 409.9
+  },
+  {
+    "id": "sagok_yuryong",
+    "name": "유룡리",
+    "town": "사곡면",
+    "type": "리",
+    "tag": "버섯마을",
+    "icon": "🍄",
+    "cx": 439.3,
+    "cy": 450.4
+  },
+  {
+    "id": "sagok_goyang",
+    "name": "고당리",
+    "town": "사곡면",
+    "type": "리",
+    "tag": "고당청정골",
+    "icon": "💧",
+    "cx": 418.6,
+    "cy": 384.9
+  },
+  {
+    "id": "useong_sangseo",
+    "name": "상서리",
+    "town": "우성면",
+    "type": "리",
+    "tag": "우성면사무소",
+    "icon": "🍈",
+    "cx": 550.9,
+    "cy": 437
+  },
+  {
+    "id": "useong_danji",
+    "name": "단지리",
+    "town": "우성면",
+    "type": "리",
+    "tag": "금강수변림",
+    "icon": "🌊",
+    "cx": 546.6,
+    "cy": 526.9
+  },
+  {
+    "id": "useong_dongdae",
+    "name": "동대리",
+    "town": "우성면",
+    "type": "리",
+    "tag": "황금들판",
+    "icon": "🌾",
+    "cx": 414,
+    "cy": 508.9
+  },
+  {
+    "id": "useong_pyeongmok",
+    "name": "평목리",
+    "town": "우성면",
+    "type": "리",
+    "tag": "평목나루",
+    "icon": "⛵",
+    "cx": 471.8,
+    "cy": 579
+  },
+  {
+    "id": "sinpung_sanjeong",
+    "name": "산정리",
+    "town": "신풍면",
+    "type": "리",
+    "tag": "신풍면사무소",
+    "icon": "🌾",
+    "cx": 364,
+    "cy": 397.4
+  },
+  {
+    "id": "sinpung_baekryong",
+    "name": "백룡리",
+    "town": "신풍면",
+    "type": "리",
+    "tag": "무성산백룡",
+    "icon": "🐉",
+    "cx": 394.5,
+    "cy": 451.6
+  },
+  {
+    "id": "sinpung_hwawung",
+    "name": "화흥리",
+    "town": "신풍면",
+    "type": "리",
+    "tag": "화흥골",
+    "icon": "🌺",
+    "cx": 265.5,
+    "cy": 420.5
+  },
+  {
+    "id": "sinpung_yongsu",
+    "name": "용수리",
+    "town": "신풍면",
+    "type": "리",
+    "tag": "용수폭포",
+    "icon": "🏞️",
+    "cx": 294,
+    "cy": 504.9
+  },
+  {
+    "id": "uidang_suchon",
+    "name": "수촌리",
+    "town": "의당면",
+    "type": "리",
+    "tag": "수촌리고분",
+    "icon": "🏺",
+    "cx": 672,
+    "cy": 431.7
+  },
+  {
+    "id": "uidang_cheongryong",
+    "name": "청룡리",
+    "town": "의당면",
+    "type": "리",
+    "tag": "의당면사무소",
+    "icon": "🌲",
+    "cx": 654.3,
+    "cy": 383
+  },
+  {
+    "id": "uidang_junghung",
+    "name": "중흥리",
+    "town": "의당면",
+    "type": "리",
+    "tag": "중흥저수지",
+    "icon": "🚣",
+    "cx": 712.2,
+    "cy": 297
+  },
+  {
+    "id": "uidang_duman",
+    "name": "두만리",
+    "town": "의당면",
+    "type": "리",
+    "tag": "짚풀마을",
+    "icon": "🌾",
+    "cx": 666.1,
+    "cy": 290.3
+  },
+  {
+    "id": "banpo_hakbong",
+    "name": "학봉리",
+    "town": "반포면",
+    "type": "리",
+    "tag": "계룡산동학사",
+    "icon": "⛰️",
+    "cx": 831.6,
+    "cy": 727.3
+  },
+  {
+    "id": "banpo_sangsin",
+    "name": "상신리",
+    "town": "반포면",
+    "type": "리",
+    "tag": "계룡도예촌",
+    "icon": "🍶",
+    "cx": 815.7,
+    "cy": 651.8
+  },
+  {
+    "id": "banpo_gongam",
+    "name": "공암리",
+    "town": "반포면",
+    "type": "리",
+    "tag": "반포면사무소",
+    "icon": "📜",
+    "cx": 767.1,
+    "cy": 595.4
+  },
+  {
+    "id": "gyeryong_jungjang",
+    "name": "중장리",
+    "town": "계룡면",
+    "type": "리",
+    "tag": "추갑사단풍",
+    "icon": "🍁",
+    "cx": 724.6,
+    "cy": 744.7
+  },
+  {
+    "id": "gyeryong_yanghwa",
+    "name": "양화리",
+    "town": "계룡면",
+    "type": "리",
+    "tag": "신원사·호수",
+    "icon": "🚣",
+    "cx": 648.3,
+    "cy": 780.5
+  },
+  {
+    "id": "gyeryong_wolam",
+    "name": "월암리",
+    "town": "계룡면",
+    "type": "리",
+    "tag": "계룡면사무소",
+    "icon": "🌙",
+    "cx": 701.9,
+    "cy": 659.3
+  },
+  {
+    "id": "gyeryong_hade",
+    "name": "하대리",
+    "town": "계룡면",
+    "type": "리",
+    "tag": "칠석두레",
+    "icon": "🌾",
+    "cx": 630.4,
+    "cy": 687
+  },
+  {
+    "id": "iin_iinri",
+    "name": "이인리",
+    "town": "이인면",
+    "type": "리",
+    "tag": "이인면사무소",
+    "icon": "🐎",
+    "cx": 575,
+    "cy": 697.9
+  },
+  {
+    "id": "iin_jumiri",
+    "name": "주미리",
+    "town": "이인면",
+    "type": "리",
+    "tag": "주미산휴양",
+    "icon": "🌄",
+    "cx": 541.5,
+    "cy": 609.4
+  },
+  {
+    "id": "iin_guam",
+    "name": "구암리",
+    "town": "이인면",
+    "type": "리",
+    "tag": "거북바위",
+    "icon": "🐢",
+    "cx": 500.9,
+    "cy": 672.8
+  },
+  {
+    "id": "iin_sinyeong",
+    "name": "신영리",
+    "town": "이인면",
+    "type": "리",
+    "tag": "이인평야",
+    "icon": "🌾",
+    "cx": 538.7,
+    "cy": 764.2
+  },
+  {
+    "id": "tancheon_samgak",
+    "name": "삼각리",
+    "town": "탄천면",
+    "type": "리",
+    "tag": "탄천면사무소",
+    "icon": "🪵",
+    "cx": 477.1,
+    "cy": 773
+  },
+  {
+    "id": "tancheon_gyeondong",
+    "name": "견동리",
+    "town": "탄천면",
+    "type": "리",
+    "tag": "견동선돌",
+    "icon": "🪨",
+    "cx": 521.6,
+    "cy": 825.8
+  },
+  {
+    "id": "tancheon_seonggi",
+    "name": "성기리",
+    "town": "탄천면",
+    "type": "리",
+    "tag": "성기산성",
+    "icon": "🏰",
+    "cx": 422.1,
+    "cy": 774.9
+  },
+  {
+    "id": "tancheon_gacheok",
+    "name": "가척리",
+    "town": "탄천면",
+    "type": "리",
+    "tag": "가척풍요골",
+    "icon": "🌾",
+    "cx": 478.6,
+    "cy": 869.2
+  },
+  {
+    "id": "junghak",
+    "name": "중학동",
+    "town": "중학동",
+    "type": "리",
+    "tag": "세계유산공산성",
+    "icon": "🏰",
+    "cx": 625,
+    "cy": 545
+  },
+  {
+    "id": "geumhak",
+    "name": "금학동",
+    "town": "금학동",
+    "type": "리",
+    "tag": "금학생태공원",
+    "icon": "🏞️",
+    "cx": 575,
+    "cy": 610
+  },
+  {
+    "id": "okryong",
+    "name": "옥룡동",
+    "town": "옥룡동",
+    "type": "리",
+    "tag": "효심공원",
+    "icon": "🌸",
+    "cx": 695,
+    "cy": 565
+  },
+  {
+    "id": "singwan",
+    "name": "신관동",
+    "town": "신관동",
+    "type": "리",
+    "tag": "공주대학교",
+    "icon": "🎓",
+    "cx": 615,
+    "cy": 465
+  },
+  {
+    "id": "ungjin",
+    "name": "웅진동",
+    "town": "웅진동",
+    "type": "리",
+    "tag": "무령왕릉",
+    "icon": "👑",
+    "cx": 565,
+    "cy": 520
+  },
+  {
+    "id": "wolsong",
+    "name": "월송동",
+    "town": "월송동",
+    "type": "리",
+    "tag": "월송신도심",
+    "icon": "🏢",
+    "cx": 700,
+    "cy": 475
+  }
+]

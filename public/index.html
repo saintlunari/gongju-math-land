@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>🏰 공주시 곱셈 땅따먹기 대작전</title>
+  <link rel="stylesheet" href="/css/student.css">
+  <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+
+  <!-- 상단 프로필 및 헤더 바 -->
+  <header class="header-bar">
+    <div class="game-title">
+      🏰 <span>공주시</span> 땅따먹기
+    </div>
+    <div class="my-profile-pill">
+      <span class="my-avatar" id="my-avatar-display">🐯</span>
+      <div class="my-info">
+        <div class="my-name">
+          <span id="my-name-display">학생 이름</span>
+          <span class="color-dot" id="my-color-dot" style="background-color: #FF5252;"></span>
+        </div>
+        <div class="my-stats">
+          <span>🚩 내 땅: <b id="my-territory-count">0</b>곳</span>
+          <span>⭐ 점수: <b id="my-score-display">0</b>점</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- 실시간 속보 티커 -->
+  <div class="news-ticker" id="news-ticker">
+    공주시 지도를 터치해서 곱셈 문제를 풀고 내 땅을 차지해보세요! 🚀
+  </div>
+
+  <!-- 메인 게임 영역 (공주시 16개 행정구역 지도) -->
+  <main class="main-content">
+    <div class="map-card">
+      <div class="map-header">
+        <span class="map-guide">🗺️ 가고 싶은 <b>공주시 읍·면·동</b>을 콕 눌러보세요!</span>
+      </div>
+      <div id="map-container"></div>
+    </div>
+  </main>
+
+  <!-- =======================================================
+       1. 입장 로비 모달 (이름, 캐릭터, 색상 설정)
+       ======================================================= -->
+  <div class="modal-overlay" id="lobby-modal">
+    <div class="modal-card">
+      <h2 class="modal-title">🎮 땅따먹기 참가하기</h2>
+
+      <div class="form-group">
+        <label class="form-label">내 이름 (또는 번호)</label>
+        <input type="text" id="input-student-name" class="input-text" placeholder="예: 2학년 김민준" maxlength="8" autofocus>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">내 캐릭터 고르기</label>
+        <div class="avatar-grid" id="avatar-grid"></div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">내 땅 색깔 고르기</label>
+        <div class="color-grid" id="color-grid"></div>
+      </div>
+
+      <button id="btn-join-game" class="btn-primary">신나게 시작하기! 🚀</button>
+    </div>
+  </div>
+
+  <!-- =======================================================
+       2. 곱셈 퀴즈 모달 (5문제 풀기 & 방어/점령)
+       ======================================================= -->
+  <div class="modal-overlay" id="quiz-modal" style="display: none;">
+    <div class="modal-card quiz-card" style="position: relative;">
+      
+      <!-- 정답 / 오답 애니메이션 피드백 오버레이 -->
+      <div class="feedback-overlay" id="feedback-overlay" style="display: none;">
+        <div class="feedback-icon" id="feedback-icon">⭐</div>
+        <div class="feedback-text" id="feedback-text">정답입니다!</div>
+      </div>
+
+      <!-- 상단 지역 및 진행도 -->
+      <div class="quiz-header">
+        <div class="quiz-region-badge" id="quiz-region-name">🌰 정안면</div>
+        <div class="quiz-progress" id="quiz-progress"></div>
+      </div>
+
+      <!-- 미션 타입 안내 -->
+      <div class="quiz-title" id="quiz-action-type">🚩 새로운 땅 점령 도전!</div>
+      <div class="quiz-concept-badge" id="quiz-concept-badge">🦘 몇씩 뛰어 세기</div>
+      <div class="quiz-question-text" id="quiz-question-text">문제가 여기에 표시됩니다</div>
+
+      <!-- 시각적 도식화 박스 (묶음 그림, 뛰어세기 화살표 등) -->
+      <div class="quiz-visual-box" id="quiz-visual-box">🌰🌰 ➔ 🌰🌰 ➔ ❓</div>
+
+      <!-- 수식 표시 박스 -->
+      <div class="quiz-formula-box">
+        <div class="quiz-subtitle" id="quiz-subtitle">다음 식을 계산해 보세요!</div>
+        <div class="quiz-formula" id="quiz-formula">4 × 7 = ?</div>
+      </div>
+
+      <!-- 내가 입력한 답 표시 -->
+      <div class="quiz-answer-display" id="quiz-user-input">?</div>
+
+      <!-- 4지선다형 모드 옵션 버튼들 -->
+      <div class="multiple-grid" id="multiple-options"></div>
+
+      <!-- 숫자 키패드 모드 (주관식 터치) -->
+      <div id="keypad-container" style="display: none;">
+        <div class="keypad-grid">
+          <button class="key-btn" data-val="1">1</button>
+          <button class="key-btn" data-val="2">2</button>
+          <button class="key-btn" data-val="3">3</button>
+          <button class="key-btn" data-val="4">4</button>
+          <button class="key-btn" data-val="5">5</button>
+          <button class="key-btn" data-val="6">6</button>
+          <button class="key-btn" data-val="7">7</button>
+          <button class="key-btn" data-val="8">8</button>
+          <button class="key-btn" data-val="9">9</button>
+          <button class="key-btn action-clear" data-val="clear">지움 ⌫</button>
+          <button class="key-btn" data-val="0">0</button>
+          <button class="key-btn action-submit" data-val="submit">정답 확인 ✔️</button>
+        </div>
+      </div>
+
+      <!-- 문제 풀이 모드 토글 (객관식 4지선다 vs 숫자 키패드) -->
+      <div class="mode-toggle-bar">
+        <button class="mode-toggle-btn active" id="btn-mode-multiple">선택형(4지선다)</button>
+        <button class="mode-toggle-btn" id="btn-mode-keypad">숫자 패드 직접 입력</button>
+        <button class="mode-toggle-btn" id="btn-close-quiz" style="color: #E53935;">포기하기 ✕</button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- 스크립트 로드 -->
+  <script src="/js/sound.js"></script>
+  <script src="/js/gongju_map.js"></script>
+  <script src="/js/student.js"></script>
+</body>
+</html>

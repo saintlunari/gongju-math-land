@@ -1,0 +1,14 @@
+{
+  "name": "gongju-math-land",
+  "version": "1.0.0",
+  "description": "초등 2학년 2학기 곱셈 학습용 공주시 지도 땅따먹기 게임",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "socket.io": "^4.8.1",
+    "qrcode": "^1.5.4"
+  }
+}

@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🏰 [교사용 대시보드] 공주시 곱셈 땅따먹기 대작전</title>
+  <link rel="stylesheet" href="/css/student.css">
+  <link rel="stylesheet" href="/css/teacher.css">
+  <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+
+  <!-- 교사용 대형 헤더 -->
+  <header class="teacher-header">
+    <div class="teacher-logo">
+      🏰 <span>공주시</span> 곱셈 땅따먹기
+      <span class="badge-teacher">교사용 전자칠판 화면</span>
+    </div>
+
+    <!-- 타이머 및 컨트롤 -->
+    <div class="header-center-info">
+      <div class="timer-box">
+        ⏱️ <span id="timer-display">10:00</span>
+      </div>
+      <div class="timer-controls">
+        <button id="btn-timer-start" class="btn-ctrl btn-start">▶️ 시작</button>
+        <button id="btn-timer-pause" class="btn-ctrl btn-pause">⏸️ 일시정지</button>
+        <button id="btn-timer-reset" class="btn-ctrl btn-reset">🔄 리셋</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- 실시간 속보 전광판 -->
+  <div class="battle-ticker" id="battle-ticker">
+    📢 게임 준비 완료! 학생 기기에서 QR 코드를 스캔하거나 주소를 입력해 입장해주세요.
+  </div>
+
+  <!-- 메인 2단 대시보드 레이아웃 -->
+  <main class="teacher-main">
+    
+    <!-- 1. 좌측 대형 공주시 지도 -->
+    <section class="map-panel">
+      <div class="panel-title">
+        <span>🗺️ 공주시 16개 행정구역 실시간 영토 점령 지도</span>
+      </div>
+      <div id="teacher-map-container"></div>
+    </section>
+
+    <!-- 2. 우측 컨트롤 & 랭킹 사이드바 -->
+    <aside class="sidebar-panel">
+
+      <!-- 접속 QR 코드 카드 -->
+      <div class="side-card connect-card">
+        <img id="teacher-qr-img" class="qr-image" src="" alt="접속 QR코드">
+        <div class="connect-info">
+          <div class="connect-title">📱 학생 태블릿 / 폰 접속 주소</div>
+          <div class="connect-url" id="teacher-connect-url">http://...</div>
+          <div class="connect-sub">같은 교실 Wi-Fi에서 QR코드를 카메라로 비추면 바로 열립니다!</div>
+        </div>
+      </div>
+
+      <!-- 실시간 영토 랭킹 리더보드 -->
+      <div class="side-card">
+        <div class="panel-title">
+          <span>🏆 실시간 영토 랭킹</span>
+        </div>
+        <div class="ranking-list" id="ranking-list">
+          <div style="color: #64748B; text-align: center; padding: 20px;">학생 접속 대기 중...</div>
+        </div>
+      </div>
+
+      <!-- 교사용 게임 제어판 -->
+      <div class="side-card">
+        <div class="panel-title">
+          <span>⚙️ 교사용 게임 설정</span>
+        </div>
+
+        <div class="settings-grid">
+          <div>
+            <label style="font-size: 0.85rem; color: #94A3B8; display: block; margin-bottom: 4px;">구구단 단원 범위</label>
+            <select id="select-dan-range" class="select-control">
+              <option value="all">2단 ~ 9단 전체</option>
+              <option value="2to5">2단 ~ 5단 (기초)</option>
+              <option value="6to9">6단 ~ 9단 (심화)</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size: 0.85rem; color: #94A3B8; display: block; margin-bottom: 4px;">타이머 기본 시간</label>
+            <select id="select-timer-duration" class="select-control">
+              <option value="10">10분 (추천)</option>
+              <option value="5">5분 (스피드전)</option>
+              <option value="15">15분 (집중전)</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="margin-top: 10px;">
+          <label style="font-size: 0.85rem; color: #94A3B8; display: block; margin-bottom: 4px;">곱셈 개념 출제 모드</label>
+          <select id="select-concept-mode" class="select-control">
+            <option value="all">🌟 7대 개념 골고루 (뛰어세기·묶어세기·몇배·곱셈식)</option>
+            <option value="visual">🦘 기초 직관형 (뛰어세기 / 묶어세기 / 하나씩세기)</option>
+            <option value="concept">🎁 개념 이해형 (몇씩 몇묶음 / 몇의 몇배)</option>
+            <option value="formula">✏️ 식 변환형 (덧셈식➔곱셈식 / 몇의 몇배➔곱셈식)</option>
+          </select>
+        </div>
+
+        <button id="btn-reset-regions" class="btn-action-full">🧹 모든 영토 초기화 (새 게임)</button>
+      </div>
+
+    </aside>
+
+  </main>
+
+  <!-- 사운드 및 스크립트 -->
+  <script src="/js/sound.js"></script>
+  <script src="/js/gongju_map.js"></script>
+  <script src="/js/teacher.js"></script>
+</body>
+</html>
