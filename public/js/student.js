@@ -5,7 +5,7 @@ const socket = io();
 let myProfile = {
   name: '',
   avatar: '🐯',
-  color: '#FF5252',
+  color: '#2563EB',
   teamId: 'team_1',
   items: {
     eraser: 1, // 오답 지우개 기본 1개 제공
@@ -14,7 +14,7 @@ let myProfile = {
   badges: []
 };
 
-let serverGameMode = 'individual'; // 'individual' or 'team'
+let serverGameMode = 'team'; // 'team' (반 대항전) 기본값
 let serverTeams = {
   team_1: { id: 'team_1', name: '2학년 1반', shortName: '1반', avatar: '1️⃣', color: '#2563EB' },
   team_2: { id: 'team_2', name: '2학년 2반', shortName: '2반', avatar: '2️⃣', color: '#EA580C' },
@@ -61,10 +61,40 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // 1. 로비 초기화 (프로필 및 반 설정)
+function renderTeamGrid() {
+  const teamGrid = document.getElementById('team-grid');
+  if (!teamGrid) return;
+
+  const colorLabels = {
+    'team_1': '🔵 파란색 팀',
+    'team_2': '🟠 주황색 팀',
+    'team_3': '🔴 빨간색 팀',
+    'team_4': '🟢 초록색 팀'
+  };
+
+  teamGrid.innerHTML = Object.values(serverTeams).map((t, idx) => {
+    const isActive = (t.id === myProfile.teamId) || (idx === 0 && !myProfile.teamId);
+    const colorLabel = colorLabels[t.id] || `🎨 ${t.color} 팀`;
+    return `
+      <div class="team-item ${isActive ? 'active' : ''}" data-team="${t.id}" style="--team-color: ${t.color}; border-color: ${t.color};">
+        <span class="team-avatar">${t.avatar}</span>
+        <div class="team-text-box">
+          <span class="team-name">${t.name}</span>
+          <span class="team-color-badge" style="background: ${t.color}22; color: ${t.color}; border: 1px solid ${t.color}55;">
+            ${colorLabel}
+          </span>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
 function initLobby() {
   const avatarGrid = document.getElementById('avatar-grid');
   const colorGrid = document.getElementById('color-grid');
   const teamGrid = document.getElementById('team-grid');
+
+  renderTeamGrid();
 
   // 학급(반) 선택 그리드 클릭 이벤트
   if (teamGrid) {
@@ -121,7 +151,7 @@ function initLobby() {
     // 반 대항전 모드일 때 해당 반 기본 색상/아바타 자동 반영
     if (serverGameMode === 'team' && serverTeams[myProfile.teamId]) {
       const t = serverTeams[myProfile.teamId];
-      myProfile.avatar = t.avatar;
+      myProfile.avatar = myProfile.avatar || t.avatar;
       myProfile.color = t.color;
     }
 
@@ -689,7 +719,7 @@ function adaptGameModeUI(mode) {
 
   if (mode === 'team') {
     if (teamGroup) teamGroup.style.display = 'block';
-    if (avatarGroup) avatarGroup.style.display = 'none';
+    if (avatarGroup) avatarGroup.style.display = 'block';
     if (colorGroup) colorGroup.style.display = 'none';
   } else {
     if (teamGroup) teamGroup.style.display = 'none';
@@ -699,10 +729,19 @@ function adaptGameModeUI(mode) {
   updateProfileUI();
 }
 
-// 소켓 실시간 이벤트 수신
-socket.on('joined_success', (data) => {
-  serverGameMode = data.gameState.settings.gameMode || 'individual';
+// 서버 접속 즉시 현재 게임 모드 및 팀 목록 동기화 (로비 화면 준비)
+socket.on('init_game_info', (data) => {
+  if (data.gameMode) serverGameMode = data.gameMode;
   if (data.teams) serverTeams = data.teams;
+  renderTeamGrid();
+  adaptGameModeUI(serverGameMode);
+});
+
+// 소켓 실시간 이벤트 수신 (입장 완료)
+socket.on('joined_success', (data) => {
+  serverGameMode = data.gameState.settings.gameMode || 'team';
+  if (data.teams) serverTeams = data.teams;
+  renderTeamGrid();
   adaptGameModeUI(serverGameMode);
   gongjuMap.updateRegions(data.gameState.regions);
   if (data.season) {

@@ -64,7 +64,7 @@ const HERITAGE_BADGES = {
 let gameState = {
   status: 'playing', // 'ready', 'playing', 'paused', 'ended'
   settings: {
-    gameMode: 'individual', // 'individual' (개인전) | 'team' (반 대항전)
+    gameMode: 'team', // 기본 모드를 'team' (2학년 반 대항전)으로 설정!
     danRange: 'all', // '2to5', '6to9', 'all'
     conceptMode: 'all', // 'all', 'visual', 'concept', 'formula'
     inputMode: 'both', // 'keypad', 'multiple', 'both'
@@ -216,6 +216,12 @@ function calculateRanking() {
 io.on('connection', (socket) => {
   console.log(`[접속] 새 소켓 연결: ${socket.id}`);
 
+  // 접속 즉시 현재 게임 모드와 팀 목록을 전송 (학생이 로비 입장 시 바로 반을 확인하고 선택할 수 있도록 함)
+  socket.emit('init_game_info', {
+    gameMode: gameState.settings.gameMode,
+    teams: TEAMS
+  });
+
   // 교사인지 학생인지 등록
   socket.on('join_as_teacher', async (data = {}) => {
     socket.join('teachers');
@@ -247,7 +253,7 @@ io.on('connection', (socket) => {
     const player = {
       id: socket.id,
       name: profile.name || `학생${socket.id.slice(0, 4)}`,
-      avatar: (isTeamMode && team) ? team.avatar : (profile.avatar || '🐯'),
+      avatar: profile.avatar || (team ? team.avatar : '🐯'),
       color: (isTeamMode && team) ? team.color : (profile.color || '#FF5252'),
       teamId: team ? team.id : null,
       score: 0,
