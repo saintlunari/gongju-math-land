@@ -12,6 +12,8 @@ validateQuestionBank();
 // 주간 일요일 초기화 시즌 매니저 인스턴스 생성
 const seasonManager = new SeasonManager();
 
+const path = require('path');
+
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -22,6 +24,11 @@ const PORT = process.env.PORT || 3000;
 
 // 정적 파일 제공
 app.use(express.static('public'));
+
+// 교사용 대시보드 전용 경로 (/teacher 로 바로 접속 가능)
+app.get('/teacher', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'teacher.html'));
+});
 
 // 로컬 IP 주소 감지
 function getLocalIpAddress() {
@@ -226,7 +233,7 @@ io.on('connection', (socket) => {
   socket.on('join_as_teacher', async (data = {}) => {
     socket.join('teachers');
 
-    let studentUrl = `http://${localIp}:${PORT}`;
+    let studentUrl = process.env.RENDER_EXTERNAL_URL || `http://${localIp}:${PORT}`;
     if (data.origin && !data.origin.includes('localhost') && !data.origin.includes('127.0.0.1')) {
       studentUrl = data.origin;
     }
@@ -559,13 +566,13 @@ setInterval(() => {
   }
 }, 10000);
 
-// 서버 기동
-server.listen(PORT, '0.0.0.0', () => {
+// 서버 기동 (듀얼 스택 바인딩으로 IPv4 및 IPv6 localhost 지연 완전 해소)
+server.listen(PORT, () => {
   console.log(`====================================================`);
   console.log(`  🏰 공주시 곱셈 땅따먹기 대작전 서버 가동 완료!`);
   console.log(`  --------------------------------------------------`);
   console.log(`  [교사용 전자칠판 화면]`);
-  console.log(`  👉 http://localhost:${PORT}/teacher.html`);
+  console.log(`  👉 http://127.0.0.1:${PORT}/teacher.html`);
   console.log(`  --------------------------------------------------`);
   console.log(`  [학생 접속 주소 (같은 Wi-Fi 접속)]`);
   console.log(`  👉 http://${localIp}:${PORT}`);

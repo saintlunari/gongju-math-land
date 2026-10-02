@@ -1673,12 +1673,6 @@ class GongjuMap {
       <div class="gongju-map-wrapper">
         <svg id="${this.container.id}-svg" viewBox="${this.view.x} ${this.view.y} ${this.view.w} ${this.view.h}" class="gongju-svg real-map-svg" xmlns="http://www.w3.org/2000/svg">
           <defs>
-            <filter id="soft-shadow" x="-5%" y="-5%" width="110%" height="110%">
-              <feDropShadow dx="0" dy="1.5" stdDeviation="2" flood-color="#000" flood-opacity="0.12" />
-            </filter>
-            <filter id="gold-glow" x="-20%" y="-20%" width="140%" height="140%">
-              <feDropShadow dx="0" dy="0" stdDeviation="6" flood-color="#FFD700" flood-opacity="0.9" />
-            </filter>
             <linearGradient id="river-blue" x1="0%" y1="0%" x2="100%" y2="100%">
               <stop offset="0%" stop-color="#0288D1" stop-opacity="0.85" />
               <stop offset="50%" stop-color="#29B6F6" stop-opacity="0.9" />
@@ -1710,6 +1704,7 @@ class GongjuMap {
       </div>
     `;
     this.svg = document.getElementById(`${this.container.id}-svg`);
+    this.initDOMCache();
     this.attachEvents();
     this.bindGestures();
   }
@@ -1724,8 +1719,8 @@ class GongjuMap {
 
     return `
       <g class="region-node real-region-node all-ri-node" id="region-node-${item.id}" data-id="${item.id}" style="transform-origin: ${item.cx}px ${item.cy}px;">
-        <!-- 실제 행정구역 경계선 패스 -->
-        <path class="region-path real-region-path all-ri-path" id="region-path-${item.id}" d="${item.d}" filter="url(#soft-shadow)" />
+        <!-- 실제 행정구역 경계선 패스 (초경량 고속 렌더링) -->
+        <path class="region-path real-region-path all-ri-path" id="region-path-${item.id}" d="${item.d}" />
 
         <!-- 방패 오라 -->
         <circle class="shield-aura" id="shield-aura-${item.id}" cx="${item.cx}" cy="${item.cy}" r="18" />
@@ -1755,20 +1750,45 @@ class GongjuMap {
     `;
   }
 
-  attachEvents() {
+  // 150개 영토 DOM 요소 레퍼런스 사전 캐싱 (매번 getElementById 호출 제거)
+  initDOMCache() {
+    this.domCache = {};
     this.layout.forEach(item => {
       const node = document.getElementById(`region-node-${item.id}`);
-      if (!node) return;
-      node.addEventListener('click', () => {
-        if (this.dragDistance > 12) return;
-        window.soundManager.playClick();
-        if (this.options.onRegionClick) {
-          this.options.onRegionClick(item.id, this.getRegion(item.id));
-        }
-      });
+      if (node) {
+        this.domCache[item.id] = {
+          node,
+          path: document.getElementById(`region-path-${item.id}`),
+          aura: document.getElementById(`shield-aura-${item.id}`),
+          avatarBg: document.getElementById(`avatar-bg-${item.id}`),
+          avatarIcon: document.getElementById(`avatar-icon-${item.id}`),
+          ownerPill: document.getElementById(`owner-pill-${item.id}`),
+          ownerText: document.getElementById(`owner-text-${item.id}`),
+          shieldBadge: document.getElementById(`shield-badge-${item.id}`),
+          shieldText: document.getElementById(`shield-text-${item.id}`)
+        };
+      }
     });
   }
 
+  // 이벤트 위임(Event Delegation)으로 단 1개의 이벤트 리스너로 150개 영토 클릭 처리
+  attachEvents() {
+    if (!this.svg) return;
+    this.svg.addEventListener('click', (e) => {
+      if (this.dragDistance > 12) return;
+      const node = e.target.closest('.region-node');
+      if (!node) return;
+      const regionId = node.dataset.id;
+      if (!regionId) return;
+
+      window.soundManager.playClick();
+      if (this.options.onRegionClick) {
+        this.options.onRegionClick(regionId, this.getRegion(regionId));
+      }
+    });
+  }
+
+  // requestAnimationFrame 기반 60FPS 부드러운 패닝 및 핀치 줌 제스처
   bindGestures() {
     if (!this.svg) return;
 
@@ -1776,6 +1796,19 @@ class GongjuMap {
     let startPoint = { x: 0, y: 0 };
     let startView = { ...this.view };
     const activeTouches = new Map();
+    let initialPinchDist = null;
+    let initialPinchView = null;
+    let rafPending = false;
+
+    const scheduleApplyView = () => {
+      if (!rafPending) {
+        rafPending = true;
+        requestAnimationFrame(() => {
+          this.applyView();
+          rafPending = false;
+        });
+      }
+    };
 
     const getScale = () => {
       const rect = this.svg.getBoundingClientRect();
@@ -1793,14 +1826,18 @@ class GongjuMap {
         startPoint = { x: e.clientX, y: e.clientY };
         startView = { ...this.view };
         this.svg.style.cursor = 'grabbing';
+      } else if (activeTouches.size === 2) {
+        const touches = Array.from(activeTouches.values());
+        initialPinchDist = Math.hypot(touches[0].x - touches[1].x, touches[0].y - touches[1].y);
+        initialPinchView = { ...this.view };
       }
     });
 
     window.addEventListener('pointermove', (e) => {
-      if (!isPointerDown || !activeTouches.has(e.pointerId)) return;
+      if (!activeTouches.has(e.pointerId)) return;
       activeTouches.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
-      if (activeTouches.size === 1) {
+      if (activeTouches.size === 1 && isPointerDown) {
         const dx = e.clientX - startPoint.x;
         const dy = e.clientY - startPoint.y;
         this.dragDistance = Math.hypot(dx, dy);
@@ -1808,12 +1845,31 @@ class GongjuMap {
         const { sx, sy } = getScale();
         this.view.x = startView.x - dx * sx;
         this.view.y = startView.y - dy * sy;
-        this.applyView();
+        scheduleApplyView();
+      } else if (activeTouches.size === 2 && initialPinchDist && initialPinchView) {
+        const touches = Array.from(activeTouches.values());
+        const currentDist = Math.hypot(touches[0].x - touches[1].x, touches[0].y - touches[1].y);
+        if (currentDist > 5 && initialPinchDist > 5) {
+          const factor = initialPinchDist / currentDist;
+          const rect = this.svg.getBoundingClientRect();
+          const midClientX = (touches[0].x + touches[1].x) / 2 - rect.left;
+          const midClientY = (touches[0].y + touches[1].y) / 2 - rect.top;
+          const { sx, sy } = getScale();
+          const mapMidX = initialPinchView.x + midClientX * sx;
+          const mapMidY = initialPinchView.y + midClientY * sy;
+
+          this.zoomAt(factor, mapMidX, mapMidY, false);
+          scheduleApplyView();
+        }
       }
     });
 
     const pointerEnd = (e) => {
       activeTouches.delete(e.pointerId);
+      if (activeTouches.size < 2) {
+        initialPinchDist = null;
+        initialPinchView = null;
+      }
       if (activeTouches.size === 0) {
         isPointerDown = false;
         if (this.svg) this.svg.style.cursor = 'grab';
@@ -1833,8 +1889,9 @@ class GongjuMap {
       const mapCursorX = this.view.x + cursorX * sx;
       const mapCursorY = this.view.y + cursorY * sy;
 
-      const factor = e.deltaY < 0 ? 0.82 : 1.22;
-      this.zoomAt(factor, mapCursorX, mapCursorY);
+      const factor = e.deltaY < 0 ? 0.85 : 1.18;
+      this.zoomAt(factor, mapCursorX, mapCursorY, false);
+      scheduleApplyView();
     }, { passive: false });
   }
 
@@ -1846,7 +1903,7 @@ class GongjuMap {
     this.svg.setAttribute('viewBox', `${this.view.x} ${this.view.y} ${this.view.w} ${this.view.h}`);
   }
 
-  zoomAt(factor, cx, cy) {
+  zoomAt(factor, cx, cy, autoApply = true) {
     const newW = this.view.w * factor;
     const newH = this.view.h * factor;
     if (newW < 220 || newW > 1400) return;
@@ -1855,7 +1912,9 @@ class GongjuMap {
     this.view.y = cy - ((cy - this.view.y) * newH) / this.view.h;
     this.view.w = newW;
     this.view.h = newH;
-    this.applyView();
+    if (autoApply) {
+      this.applyView();
+    }
   }
 
   zoomIn() {
@@ -1887,7 +1946,8 @@ class GongjuMap {
   }
 
   highlightSuggest(regionId) {
-    const node = document.getElementById(`region-node-${regionId}`);
+    const el = this.domCache ? this.domCache[regionId] : null;
+    const node = el ? el.node : document.getElementById(`region-node-${regionId}`);
     if (!node) return;
 
     node.classList.add('suggest-pulse');
@@ -1904,9 +1964,10 @@ class GongjuMap {
 
   updateRegions(regions) {
     this.regionsData = regions || {};
-    Object.values(regions || {}).forEach(reg => {
-      this.updateSingleRegion(reg);
-    });
+    const values = Object.values(regions || {});
+    for (let i = 0; i < values.length; i++) {
+      this.updateSingleRegion(values[i]);
+    }
   }
 
   updateSingleRegion(reg) {
@@ -1914,50 +1975,57 @@ class GongjuMap {
     if (!this.regionsData) this.regionsData = {};
     this.regionsData[reg.id] = reg;
 
-    const pathEl = document.getElementById(`region-path-${reg.id}`);
-    const auraEl = document.getElementById(`shield-aura-${reg.id}`);
-    const avatarBg = document.getElementById(`avatar-bg-${reg.id}`);
-    const avatarIcon = document.getElementById(`avatar-icon-${reg.id}`);
-    const ownerPill = document.getElementById(`owner-pill-${reg.id}`);
-    const ownerText = document.getElementById(`owner-text-${reg.id}`);
-    const shieldBadge = document.getElementById(`shield-badge-${reg.id}`);
-    const shieldText = document.getElementById(`shield-text-${reg.id}`);
-    const nodeEl = document.getElementById(`region-node-${reg.id}`);
-
+    const el = this.domCache ? this.domCache[reg.id] : null;
+    const pathEl = el ? el.path : document.getElementById(`region-path-${reg.id}`);
     if (!pathEl) return;
+
+    const auraEl = el ? el.aura : document.getElementById(`shield-aura-${reg.id}`);
+    const avatarBg = el ? el.avatarBg : document.getElementById(`avatar-bg-${reg.id}`);
+    const avatarIcon = el ? el.avatarIcon : document.getElementById(`avatar-icon-${reg.id}`);
+    const ownerPill = el ? el.ownerPill : document.getElementById(`owner-pill-${reg.id}`);
+    const ownerText = el ? el.ownerText : document.getElementById(`owner-text-${reg.id}`);
+    const shieldBadge = el ? el.shieldBadge : document.getElementById(`shield-badge-${reg.id}`);
+    const shieldText = el ? el.shieldText : document.getElementById(`shield-text-${reg.id}`);
+    const nodeEl = el ? el.node : document.getElementById(`region-node-${reg.id}`);
 
     if (reg.ownerId) {
       pathEl.style.fill = reg.ownerColor;
       pathEl.classList.add('is-conquered');
 
-      avatarBg.style.fill = '#FFFFFF';
-      avatarBg.style.stroke = reg.ownerColor;
-      avatarIcon.textContent = reg.ownerAvatar || '👑';
+      if (avatarBg) {
+        avatarBg.style.fill = '#FFFFFF';
+        avatarBg.style.stroke = reg.ownerColor;
+      }
+      if (avatarIcon) avatarIcon.textContent = reg.ownerAvatar || '👑';
 
-      ownerPill.style.display = 'block';
-      ownerText.textContent = reg.ownerName.slice(0, 3);
+      if (ownerPill) ownerPill.style.display = 'block';
+      if (ownerText) ownerText.textContent = reg.ownerName ? reg.ownerName.slice(0, 3) : '';
 
-      shieldBadge.style.display = 'block';
-      shieldText.textContent = `🛡️${reg.shield}`;
+      if (shieldBadge) shieldBadge.style.display = 'block';
+      if (shieldText) shieldText.textContent = `🛡️${reg.shield}`;
 
-      if (reg.shield >= 3) {
-        auraEl.style.display = 'block';
-        auraEl.style.stroke = '#FFD700';
-        auraEl.style.strokeWidth = `${(reg.shield - 2) * 2}px`;
-      } else {
-        auraEl.style.display = 'none';
+      if (auraEl) {
+        if (reg.shield >= 3) {
+          auraEl.style.display = 'block';
+          auraEl.style.stroke = '#FFD700';
+          auraEl.style.strokeWidth = `${(reg.shield - 2) * 2}px`;
+        } else {
+          auraEl.style.display = 'none';
+        }
       }
     } else {
       pathEl.style.fill = '#E8F5E9';
       pathEl.classList.remove('is-conquered');
 
-      avatarBg.style.fill = '#F5F5F5';
-      avatarBg.style.stroke = '#BDBDBD';
-      avatarIcon.textContent = reg.icon;
+      if (avatarBg) {
+        avatarBg.style.fill = '#F5F5F5';
+        avatarBg.style.stroke = '#BDBDBD';
+      }
+      if (avatarIcon) avatarIcon.textContent = reg.icon || '📍';
 
-      ownerPill.style.display = 'none';
-      shieldBadge.style.display = 'none';
-      auraEl.style.display = 'none';
+      if (ownerPill) ownerPill.style.display = 'none';
+      if (shieldBadge) shieldBadge.style.display = 'none';
+      if (auraEl) auraEl.style.display = 'none';
     }
 
     if (reg.isUnderAttack && nodeEl) {
@@ -1966,50 +2034,50 @@ class GongjuMap {
     }
   }
 
+  // O(1) 영토 선택 전환
   setSelectedRegion(regionId) {
-    this.selectedRegionId = regionId;
-    const regionsGroup = this.svg ? this.svg.querySelector('.regions-group') : null;
-    const selectedLayer = this.svg ? this.svg.querySelector('.selected-region-layer') : null;
+    if (this.selectedRegionId === regionId) return;
 
-    // 이전에 selected-region-layer에 올라가 있던 노드가 있다면 원래 regions-group으로 복귀
-    if (selectedLayer && regionsGroup) {
-      while (selectedLayer.firstChild) {
-        regionsGroup.appendChild(selectedLayer.firstChild);
+    const selectedLayer = this.svg ? this.svg.querySelector('.selected-region-layer') : null;
+    const regionsGroup = this.svg ? this.svg.querySelector('.regions-group') : null;
+
+    // 이전 선택 해제
+    if (this.selectedRegionId) {
+      const prevEl = this.domCache ? this.domCache[this.selectedRegionId] : null;
+      const prevNode = prevEl ? prevEl.node : document.getElementById(`region-node-${this.selectedRegionId}`);
+      if (prevNode) {
+        prevNode.classList.remove('selected');
+        if (regionsGroup && prevNode.parentElement === selectedLayer) {
+          regionsGroup.appendChild(prevNode);
+        }
       }
     }
 
-    let selectedNode = null;
-    this.layout.forEach(item => {
-      const node = document.getElementById(`region-node-${item.id}`);
-      if (node) {
-        if (item.id === regionId) {
-          node.classList.add('selected');
-          selectedNode = node;
-        } else {
-          node.classList.remove('selected');
-        }
-      }
-    });
+    this.selectedRegionId = regionId;
 
-    // 선택된 영토를 최상위 selectedLayer로 이동시켜 모든 영토 및 하천 위로 100% 가림 없이 팝아웃
-    if (selectedNode) {
-      if (selectedLayer) {
-        selectedLayer.appendChild(selectedNode);
-      } else if (selectedNode.parentElement) {
-        selectedNode.parentElement.appendChild(selectedNode);
+    // 새 선택 적용
+    if (regionId) {
+      const currEl = this.domCache ? this.domCache[regionId] : null;
+      const currNode = currEl ? currEl.node : document.getElementById(`region-node-${regionId}`);
+      if (currNode) {
+        currNode.classList.add('selected');
+        if (selectedLayer) {
+          selectedLayer.appendChild(currNode);
+        }
       }
     }
   }
 
   // 실시간 점령/공격 발생 시 지도상에서 3D 팝아웃 및 하이라이트 연출
   triggerRealtimePop(regionId, eventType = 'conquered') {
-    const node = document.getElementById(`region-node-${regionId}`);
+    const el = this.domCache ? this.domCache[regionId] : null;
+    const node = el ? el.node : document.getElementById(`region-node-${regionId}`);
     const selectedLayer = this.svg ? this.svg.querySelector('.selected-region-layer') : null;
     const regionsGroup = this.svg ? this.svg.querySelector('.regions-group') : null;
 
     if (!node) return;
 
-    if (selectedLayer) {
+    if (selectedLayer && node.parentElement !== selectedLayer) {
       selectedLayer.appendChild(node);
     }
 
