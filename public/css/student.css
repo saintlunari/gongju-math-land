@@ -460,6 +460,7 @@ body {
 .geumgang-river {
   stroke-dasharray: 6 3;
   animation: river-flow 30s linear infinite;
+  pointer-events: none !important;
 }
 
 @keyframes river-flow {
@@ -471,13 +472,18 @@ body {
   font-size: 14px;
   font-weight: bold;
   opacity: 0.7;
+  pointer-events: none !important;
+  user-select: none;
 }
 
 .region-node {
   cursor: pointer;
-  transform-box: fill-box;
-  transform-origin: center;
+  transform-box: view-box;
   transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.region-node .region-content {
+  pointer-events: none;
 }
 
 .region-node:hover {
@@ -545,6 +551,7 @@ body {
 .yugu-stream, .jeongan-stream {
   stroke-dasharray: 4 2;
   animation: river-flow 25s linear infinite;
+  pointer-events: none !important;
 }
 
 .region-node.selected {

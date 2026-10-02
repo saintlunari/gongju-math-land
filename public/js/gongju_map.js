@@ -1703,6 +1703,9 @@ class GongjuMap {
           <path class="geumgang-river" d="M 380,590 C 440,540 480,500 530,485 C 570,475 600,490 640,495 C 700,505 760,490 840,495" 
                 fill="none" stroke="url(#river-blue)" stroke-width="15" stroke-linecap="round" />
           <text x="480" y="470" class="river-label">~ 금강 (錦江) ~</text>
+
+          <!-- 선택된 영토 전용 최상위 레이어 (모든 인접 영토 및 하천 위로 100% 팝아웃) -->
+          <g class="selected-region-layer" id="${this.container.id}-selected-layer"></g>
         </svg>
       </div>
     `;
@@ -1720,7 +1723,7 @@ class GongjuMap {
     const pillY = isDong ? 19 : 17;
 
     return `
-      <g class="region-node real-region-node all-ri-node" id="region-node-${item.id}" data-id="${item.id}">
+      <g class="region-node real-region-node all-ri-node" id="region-node-${item.id}" data-id="${item.id}" style="transform-origin: ${item.cx}px ${item.cy}px;">
         <!-- 실제 행정구역 경계선 패스 -->
         <path class="region-path real-region-path all-ri-path" id="region-path-${item.id}" d="${item.d}" filter="url(#soft-shadow)" />
 
@@ -1757,7 +1760,7 @@ class GongjuMap {
       const node = document.getElementById(`region-node-${item.id}`);
       if (!node) return;
       node.addEventListener('click', () => {
-        if (this.dragDistance > 8) return;
+        if (this.dragDistance > 12) return;
         window.soundManager.playClick();
         if (this.options.onRegionClick) {
           this.options.onRegionClick(item.id, this.regionsData[item.id]);
@@ -1800,7 +1803,7 @@ class GongjuMap {
       if (activeTouches.size === 1) {
         const dx = e.clientX - startPoint.x;
         const dy = e.clientY - startPoint.y;
-        this.dragDistance += Math.hypot(dx, dy);
+        this.dragDistance = Math.hypot(dx, dy);
 
         const { sx, sy } = getScale();
         this.view.x = startView.x - dx * sx;
@@ -1955,6 +1958,16 @@ class GongjuMap {
 
   setSelectedRegion(regionId) {
     this.selectedRegionId = regionId;
+    const regionsGroup = this.svg ? this.svg.querySelector('.regions-group') : null;
+    const selectedLayer = this.svg ? this.svg.querySelector('.selected-region-layer') : null;
+
+    // 이전에 selected-region-layer에 올라가 있던 노드가 있다면 원래 regions-group으로 복귀
+    if (selectedLayer && regionsGroup) {
+      while (selectedLayer.firstChild) {
+        regionsGroup.appendChild(selectedLayer.firstChild);
+      }
+    }
+
     let selectedNode = null;
     this.layout.forEach(item => {
       const node = document.getElementById(`region-node-${item.id}`);
@@ -1968,9 +1981,13 @@ class GongjuMap {
       }
     });
 
-    // 선택된 영토를 SVG 최상단 레이어로 이동시켜 이웃 영토에 가려짐 없이 깔끔하게 튀어나오도록 함
-    if (selectedNode && selectedNode.parentElement) {
-      selectedNode.parentElement.appendChild(selectedNode);
+    // 선택된 영토를 최상위 selectedLayer로 이동시켜 모든 영토 및 하천 위로 100% 가림 없이 팝아웃
+    if (selectedNode) {
+      if (selectedLayer) {
+        selectedLayer.appendChild(selectedNode);
+      } else if (selectedNode.parentElement) {
+        selectedNode.parentElement.appendChild(selectedNode);
+      }
     }
   }
 }
