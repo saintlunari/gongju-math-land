@@ -37,6 +37,9 @@ let currentRegionId = null;
 let currentInputMode = 'multiple'; // 'multiple' or 'keypad'
 let userInputValue = '';
 let gongjuMap = null;
+let activeShieldItem = false;
+let currentChallengeWrongCount = 0; // 한 영토 5문제 중 오답 횟수 (3번 틀리면 1분 잠금)
+const lockedRegions = {}; // { [regionId]: { unlockTime, regionName, intervalId } }
 
 // 아바타 목록 16종
 const AVATARS = ['🐯', '🐻', '🐰', '🦊', '🐼', '🐶', '🐱', '🦁', '🦄', '👑', '🤴', '🧙', '🐿️', '🐸', '🦉', '🐨'];
@@ -192,10 +195,25 @@ function initMap() {
   gongjuMap = new window.GongjuMap('map-container', {
     onRegionClick: handleRegionClick
   });
+
+  // 새로고침 시 이전에 걸려있던 1분 잠금 상태 복원
+  setTimeout(() => {
+    restoreLockedRegionsFromStorage();
+  }, 100);
 }
 
 // 영토 클릭 시 처리
 function handleRegionClick(regionId, regionData) {
+  // 1분 잠금 상태 확인 (3스트라이크 오답 페널티)
+  if (isRegionLocked(regionId)) {
+    const remainSec = getRemainingLockSeconds(regionId);
+    const regName = (regionData && (regionData.fullName || regionData.name)) || (gongjuMap?.regionsData?.[regionId]?.name) || '이 영토';
+    showLockoutModal(regName, remainSec, regionId);
+    window.soundManager.playWrong();
+    showTicker(`⛔ [${regName}] 3번 오답 페널티로 ${remainSec}초 동안 도전할 수 없습니다!`);
+    return;
+  }
+
   currentRegionId = regionId;
   gongjuMap.setSelectedRegion(regionId);
 
@@ -208,6 +226,8 @@ socket.on('receive_quiz', (data) => {
   currentQuizzes = data.quizzes;
   currentQuizIndex = 0;
   userInputValue = '';
+  currentChallengeWrongCount = 0; // 새 영토 도전 시작 시 오답 수 초기화
+  updateStrikeDots(0);
 
   const modal = document.getElementById('quiz-modal');
   modal.style.display = 'flex';
@@ -217,11 +237,12 @@ socket.on('receive_quiz', (data) => {
   
   let actionTitle = '';
   if (data.isOwner) {
-    actionTitle = '🛡️ 내 땅 지키기! (방어막 강화)';
+    const nextShield = Math.min(5, (data.targetShield || 1) + 1);
+    actionTitle = `🛡️ 내 땅 지키기! (방어막 강화 Lv.${data.targetShield || 1} ➔ Lv.${nextShield})`;
   } else if (!data.targetShield) {
-    actionTitle = '🚩 새로운 땅 점령 도전!';
+    actionTitle = '🚩 새로운 땅 점령 도전! (방어막 Lv.1 획득)';
   } else {
-    actionTitle = `⚔️ 상대방 땅 공격! (남은 방패: ${data.targetShield})`;
+    actionTitle = `⚔️ 상대방 땅 공격! (현재 상대 방어막: Lv.${data.targetShield})`;
   }
   document.getElementById('quiz-action-type').textContent = actionTitle;
 
@@ -373,13 +394,9 @@ function checkAnswer(chosenVal) {
       }
       updateItemBadges();
     }
-  } else {
-    myStats.streak = 0;
-  }
-  updateStatsUI();
+    updateStatsUI();
 
-  showFeedback(isCorrect, () => {
-    if (isCorrect) {
+    showFeedback(true, () => {
       currentQuizIndex++;
       if (currentQuizIndex >= currentQuizzes.length) {
         // 모든 문제 정답! 정복/방어 성공
@@ -387,16 +404,34 @@ function checkAnswer(chosenVal) {
       } else {
         renderCurrentQuiz();
       }
-    } else {
+    });
+  } else {
+    // 오답 처리 (찍기 방지 3스트라이크)
+    myStats.streak = 0;
+    currentChallengeWrongCount++;
+    updateStatsUI();
+    updateStrikeDots(currentChallengeWrongCount);
+
+    if (currentChallengeWrongCount >= 3) {
+      // 3번 오답 페널티 발동! 1분 동안 잠금
+      showFeedback(false, () => {
+        handleThreeStrikesLockout(currentRegionId);
+      }, '⛔ 3번 오답! 1분간 도전이 제한됩니다!');
+      return;
+    }
+
+    const remainStrikes = 3 - currentChallengeWrongCount;
+    showFeedback(false, () => {
       // 오답 시 숫자 초기화하고 다시 도전
       userInputValue = '';
       document.getElementById('quiz-user-input').textContent = '?';
-    }
-  });
+      showTicker(`⚠️ 오답입니다! (남은 기회: ${remainStrikes}번, 3번 틀리면 1분간 잠김)`);
+    }, `오답입니다! (남은 기회: ${remainStrikes}번)`);
+  }
 }
 
 // 정답/오답 애니메이션 피드백
-function showFeedback(isCorrect, callback) {
+function showFeedback(isCorrect, callback, customText) {
   const feedbackEl = document.getElementById('feedback-overlay');
   const iconEl = document.getElementById('feedback-icon');
   const textEl = document.getElementById('feedback-text');
@@ -404,12 +439,12 @@ function showFeedback(isCorrect, callback) {
   if (isCorrect) {
     window.soundManager.playCorrect();
     iconEl.textContent = '⭐';
-    textEl.textContent = '정답입니다! 참 잘했어요!';
+    textEl.textContent = customText || '정답입니다! 참 잘했어요!';
     textEl.className = 'feedback-text feedback-correct';
   } else {
     window.soundManager.playWrong();
     iconEl.textContent = '💦';
-    textEl.textContent = '다시 한 번 생각해볼까요?';
+    textEl.textContent = customText || '다시 한 번 생각해볼까요?';
     textEl.className = 'feedback-text feedback-wrong';
   }
 
@@ -429,9 +464,11 @@ function completeChallengeSuccess() {
 
   socket.emit('complete_quiz_challenge', {
     regionId: currentRegionId,
-    success: true
+    success: true,
+    bonusShield: activeShieldItem
   });
 
+  activeShieldItem = false;
   document.getElementById('quiz-modal').style.display = 'none';
   gongjuMap.setSelectedRegion(null);
 }
@@ -486,9 +523,15 @@ function initStatsAndFeatures() {
 function suggestNextRegion() {
   if (!gongjuMap || !gongjuMap.regionsData) return;
   const allRegions = Object.values(gongjuMap.regionsData);
+  // 잠겨있지 않은 영토만 후보로 선정
+  const unlocked = allRegions.filter(r => !isRegionLocked(r.id));
+  if (unlocked.length === 0) {
+    showTicker('🔒 모든 도전 가능한 땅이 잠겨 있습니다. 잠시 후 다시 시도해보세요!');
+    return;
+  }
   // 아직 빈 땅(중립) 우선 추천
-  const neutral = allRegions.filter(r => !r.ownerId);
-  const targetPool = neutral.length > 0 ? neutral : allRegions;
+  const neutral = unlocked.filter(r => !r.ownerId);
+  const targetPool = neutral.length > 0 ? neutral : unlocked;
 
   const target = targetPool[Math.floor(Math.random() * targetPool.length)];
   if (!target) return;
@@ -643,10 +686,15 @@ function initItemsAndBadges() {
       showTicker('🛡️ 황금 방패 찬스가 없습니다! 3연속 콤보를 달성해 획득해보세요!');
       return;
     }
+    if (activeShieldItem) {
+      showTicker('🛡️ 이미 황금 방패 찬스가 적용 중입니다!');
+      return;
+    }
     myProfile.items.shield--;
+    activeShieldItem = true;
     updateItemBadges();
     window.soundManager.playShield();
-    showTicker('🛡️ 황금 방패 사용! 이번 영토 정복 시 방어막이 더욱 튼튼해집니다!');
+    showTicker('🛡️ 황금 방패 활성화! 이번 도전 성공 시 방어막 레벨이 +1 추가 강화됩니다!');
   });
 
   // 뱃지 모달 닫기 버튼
@@ -775,8 +823,13 @@ socket.on('region_updated', (data) => {
     window.soundManager.playConquer();
   } else if (data.event === 'defended') {
     window.soundManager.playShield();
+  } else if (data.event === 'attacked') {
+    window.soundManager.playWrong();
   }
   gongjuMap.updateSingleRegion(data.region);
+  if (data.region && data.region.id) {
+    gongjuMap.triggerRealtimePop(data.region.id, data.event);
+  }
   showTicker(data.text);
 });
 
@@ -940,4 +993,195 @@ document.addEventListener('DOMContentLoaded', () => {
     const modal = document.getElementById('season-conclude-modal');
     if (modal) modal.style.display = 'none';
   });
+
+  // 1분 잠금 안내 모달 닫기
+  document.getElementById('btn-close-lockout-modal')?.addEventListener('click', () => {
+    window.soundManager.playClick();
+    const modal = document.getElementById('lockout-modal');
+    if (modal) modal.style.display = 'none';
+  });
+});
+
+// ==========================================================
+// 찍기 방지 3스트라이크 1분 쿨타임 잠금 관련 함수
+// ==========================================================
+
+// 찍기 방지 3스트라이크 기회 표시기 갱신
+function updateStrikeDots(wrongCount) {
+  const dotsEl = document.getElementById('quiz-strike-dots');
+  if (!dotsEl) return;
+  if (wrongCount <= 0) {
+    dotsEl.textContent = '🟢 🟢 🟢';
+  } else if (wrongCount === 1) {
+    dotsEl.textContent = '🟢 🟢 🔴';
+  } else if (wrongCount === 2) {
+    dotsEl.textContent = '🟢 🔴 🔴';
+  } else {
+    dotsEl.textContent = '🔴 🔴 🔴';
+  }
+}
+
+// 3번 오답 시 1분 쿨타임 잠금 처리
+function handleThreeStrikesLockout(regionId) {
+  if (!regionId) return;
+
+  // 퀴즈 모달 닫기 및 지도 선택 해제
+  const quizModal = document.getElementById('quiz-modal');
+  if (quizModal) quizModal.style.display = 'none';
+  if (gongjuMap) gongjuMap.setSelectedRegion(null);
+
+  const regionData = gongjuMap?.regionsData?.[regionId];
+  const regionName = regionData?.fullName || regionData?.name || '해당 영토';
+
+  // 서버에 쿨타임 등록 요청
+  socket.emit('trigger_region_lockout', { regionId });
+
+  // 클라이언트 60초 잠금 및 타이머 개시
+  lockRegionForOneMinute(regionId, regionName, 60);
+
+  // 안내 모달 표시
+  showLockoutModal(regionName, 60, regionId);
+
+  window.soundManager.playWrong();
+  showTicker(`⛔ [${regionName}] 3번 오답 페널티로 1분 동안 잠깁니다! (빨간색 표시)`);
+}
+
+// 영토 1분 잠금 실행 (빨간색 표시 및 카운트다운 타이머)
+function lockRegionForOneMinute(regionId, regionName, durationSec = 60) {
+  if (!regionId) return;
+  const unlockTime = Date.now() + (durationSec * 1000);
+
+  // 기존 타이머가 작동 중이면 정리
+  if (lockedRegions[regionId] && lockedRegions[regionId].intervalId) {
+    clearInterval(lockedRegions[regionId].intervalId);
+  }
+
+  // 지도에 빨간색 및 타이머 뱃지 적용
+  if (gongjuMap) {
+    gongjuMap.setRegionLockout(regionId, true, durationSec);
+  }
+
+  const intervalId = setInterval(() => {
+    const now = Date.now();
+    const remainSec = Math.max(0, Math.ceil((unlockTime - now) / 1000));
+
+    // 잠금 모달이 열려있고 해당 영토일 때 모달 타이머 텍스트 갱신
+    const modal = document.getElementById('lockout-modal');
+    if (modal && modal.style.display !== 'none' && modal.dataset.regionId === regionId) {
+      const timerEl = document.getElementById('lockout-modal-timer');
+      if (timerEl) timerEl.textContent = `${remainSec}초 남음 (빨간색 표시)`;
+    }
+
+    // 지도 뱃지 카운트다운 갱신
+    if (gongjuMap) {
+      gongjuMap.updateLockoutTimer(regionId, remainSec);
+    }
+
+    if (remainSec <= 0) {
+      // 1분 만료 -> 잠금 해제!
+      clearInterval(intervalId);
+      delete lockedRegions[regionId];
+      saveLockedRegionsToStorage();
+
+      if (gongjuMap) {
+        gongjuMap.setRegionLockout(regionId, false);
+      }
+
+      if (modal && modal.dataset.regionId === regionId) {
+        modal.style.display = 'none';
+      }
+
+      showTicker(`🔓 [${regionName}] 1분 잠금이 해제되었습니다! 이제 다시 도전할 수 있습니다!`);
+      window.soundManager.playCorrect();
+    }
+  }, 1000);
+
+  lockedRegions[regionId] = {
+    unlockTime,
+    regionName,
+    intervalId
+  };
+
+  saveLockedRegionsToStorage();
+}
+
+// 해당 영토가 잠겨있는지 여부 판정
+function isRegionLocked(regionId) {
+  if (!regionId || !lockedRegions[regionId]) return false;
+  if (Date.now() >= lockedRegions[regionId].unlockTime) {
+    if (lockedRegions[regionId].intervalId) {
+      clearInterval(lockedRegions[regionId].intervalId);
+    }
+    delete lockedRegions[regionId];
+    saveLockedRegionsToStorage();
+    if (gongjuMap) gongjuMap.setRegionLockout(regionId, false);
+    return false;
+  }
+  return true;
+}
+
+// 잠금 남은 시간(초) 반환
+function getRemainingLockSeconds(regionId) {
+  if (!regionId || !lockedRegions[regionId]) return 0;
+  return Math.max(0, Math.ceil((lockedRegions[regionId].unlockTime - Date.now()) / 1000));
+}
+
+// 1분 잠금 안내 모달 표시
+function showLockoutModal(regionName, remainSec = 60, regionId = '') {
+  const modal = document.getElementById('lockout-modal');
+  if (!modal) return;
+  modal.dataset.regionId = regionId || currentRegionId || '';
+  const nameEl = document.getElementById('lockout-modal-region-name');
+  const timerEl = document.getElementById('lockout-modal-timer');
+  if (nameEl) nameEl.textContent = regionName || '해당 영토';
+  if (timerEl) timerEl.textContent = `${remainSec}초 남음 (빨간색 표시)`;
+  modal.style.display = 'flex';
+}
+
+// 세션 스토리지 저장 (새로고침 F5 꼼수 방지)
+function saveLockedRegionsToStorage() {
+  try {
+    const data = {};
+    const now = Date.now();
+    for (const [rid, item] of Object.entries(lockedRegions)) {
+      if (item.unlockTime > now) {
+        data[rid] = {
+          unlockTime: item.unlockTime,
+          regionName: item.regionName
+        };
+      }
+    }
+    sessionStorage.setItem('gongju_locked_regions', JSON.stringify(data));
+  } catch (e) {
+    // sessionStorage 오류 무시
+  }
+}
+
+// 세션 스토리지에서 잠금 목록 복원
+function restoreLockedRegionsFromStorage() {
+  try {
+    const raw = sessionStorage.getItem('gongju_locked_regions');
+    if (!raw) return;
+    const data = JSON.parse(raw);
+    const now = Date.now();
+    for (const [rid, item] of Object.entries(data)) {
+      if (item && item.unlockTime > now) {
+        const remainSec = Math.ceil((item.unlockTime - now) / 1000);
+        lockRegionForOneMinute(rid, item.regionName || '영토', remainSec);
+      }
+    }
+  } catch (e) {
+    // 파싱 오류 무시
+  }
+}
+
+// 서버에서 잠금 알림 수신 (중복/서버 검증 응답)
+socket.on('challenge_locked', (data) => {
+  const regionId = data.regionId;
+  const remainSec = data.remainSec || data.remainingSeconds || 60;
+  const regName = gongjuMap?.regionsData?.[regionId]?.fullName || gongjuMap?.regionsData?.[regionId]?.name || '해당 영토';
+  lockRegionForOneMinute(regionId, regName, remainSec);
+  showLockoutModal(regName, remainSec, regionId);
+  showTicker(data.message || `⛔ [${regName}] 3번 오답 페널티로 ${remainSec}초 동안 도전할 수 없습니다!`);
+  window.soundManager.playWrong();
 });

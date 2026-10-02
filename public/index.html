@@ -232,6 +232,13 @@
         <div class="quiz-progress" id="quiz-progress"></div>
       </div>
 
+      <!-- 찍기 방지 3스트라이크 기회 표시기 -->
+      <div class="quiz-strike-box" id="quiz-strike-box">
+        <span class="strike-label">도전 기회</span>
+        <span class="strike-dots" id="quiz-strike-dots">🟢 🟢 🟢</span>
+        <span class="strike-warn">(3번 틀리면 1분간 잠김)</span>
+      </div>
+
       <!-- 미션 타입 안내 -->
       <div class="quiz-title" id="quiz-action-type">🚩 새로운 땅 점령 도전!</div>
       <div class="quiz-concept-badge" id="quiz-concept-badge">🦘 몇씩 뛰어 세기</div>
@@ -333,6 +340,26 @@
       <div id="conclude-modal-winner" style="font-size: 1.4rem; font-weight: 900; color: #2563EB; margin: 12px 0;">🥇 2학년 1반 최종 우승!</div>
       <p id="conclude-modal-desc" style="color: #64748B; font-size: 0.95rem; margin-bottom: 22px; line-height: 1.5;">한 주간의 치열한 영토 대항전이 종료되었습니다.<br>새로운 시즌이 시작되어 150개 영토가 리셋되었습니다!</p>
       <button class="btn-primary" id="btn-close-conclude-modal" style="width: 100%;">새 시즌 정복하러 가기! 🚀</button>
+    </div>
+  </div>
+
+  <!-- =======================================================
+       6. 찍기 방지 1분 쿨타임 안내 모달
+       ======================================================= -->
+  <div class="modal-overlay" id="lockout-modal" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.85); z-index: 2600; align-items: center; justify-content: center;">
+    <div class="lockout-modal-card">
+      <div class="lockout-icon">⛔</div>
+      <div class="lockout-title">3번 오답! 1분 잠금</div>
+      <div class="lockout-desc">
+        마구 찍는 것을 방지하기 위해<br>
+        <b id="lockout-modal-region-name" style="color: #DC2626; font-size: 1.15rem;">[지역명]</b> 영토는 <b>1분 동안</b> 잠깁니다.<br>
+        다른 땅을 먼저 풀거나, 종이에 차근차근 계산해보세요! 📝
+      </div>
+      <div class="lockout-timer-box">
+        <span>⏳</span>
+        <span id="lockout-modal-timer">60초 남음 (빨간색 표시)</span>
+      </div>
+      <button class="btn-lockout-confirm" id="btn-close-lockout-modal">알겠습니다! 다른 땅 풀기 🚀</button>
     </div>
   </div>
 

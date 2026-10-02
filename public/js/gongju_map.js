@@ -1787,8 +1787,14 @@ class GongjuMap {
 
           <!-- 방어막 실드 아이콘 -->
           <g class="shield-badge" id="shield-badge-${item.id}" style="display: none;" transform="translate(11, -10)">
-            <circle cx="0" cy="0" r="6.5" class="shield-badge-circle" />
-            <text x="0" y="2" class="shield-badge-text" id="shield-text-${item.id}" font-size="6">🛡️1</text>
+            <circle cx="0" cy="0" r="7.5" class="shield-badge-circle" />
+            <text x="0" y="2.2" class="shield-badge-text" id="shield-text-${item.id}" font-size="6.5">🛡️1</text>
+          </g>
+
+          <!-- 찍기 방지 3스트라이크 1분 쿨타임 타이머 뱃지 -->
+          <g class="lockout-badge" id="lockout-badge-${item.id}" style="display: none;" transform="translate(0, -22)">
+            <rect class="lockout-badge-bg" x="-20" y="-6" width="40" height="12" rx="6" />
+            <text class="lockout-timer-text" id="lockout-text-${item.id}" x="0" y="0">🔒 60s</text>
           </g>
         </g>
       </g>
@@ -1810,7 +1816,9 @@ class GongjuMap {
           ownerPill: document.getElementById(`owner-pill-${item.id}`),
           ownerText: document.getElementById(`owner-text-${item.id}`),
           shieldBadge: document.getElementById(`shield-badge-${item.id}`),
-          shieldText: document.getElementById(`shield-text-${item.id}`)
+          shieldText: document.getElementById(`shield-text-${item.id}`),
+          lockoutBadge: document.getElementById(`lockout-badge-${item.id}`),
+          lockoutText: document.getElementById(`lockout-text-${item.id}`)
         };
       }
     });
@@ -2070,7 +2078,11 @@ class GongjuMap {
         if (reg.shield >= 3) {
           auraEl.style.display = 'block';
           auraEl.style.stroke = '#FFD700';
-          auraEl.style.strokeWidth = `${(reg.shield - 2) * 2}px`;
+          auraEl.style.strokeWidth = `${Math.min(6, 2.5 + (reg.shield - 2) * 1.2)}px`;
+        } else if (reg.shield === 2) {
+          auraEl.style.display = 'block';
+          auraEl.style.stroke = '#38BDF8';
+          auraEl.style.strokeWidth = '2.5px';
         } else {
           auraEl.style.display = 'none';
         }
@@ -2147,6 +2159,13 @@ class GongjuMap {
     void node.offsetWidth;
     node.classList.add('live-pop');
 
+    if (eventType === 'attacked') {
+      node.classList.remove('under-attack');
+      void node.offsetWidth;
+      node.classList.add('under-attack');
+      setTimeout(() => node.classList.remove('under-attack'), 1500);
+    }
+
     setTimeout(() => {
       node.classList.remove('live-pop');
       if (this.selectedRegionId !== regionId && regionsGroup && selectedLayer) {
@@ -2155,6 +2174,36 @@ class GongjuMap {
         }
       }
     }, 2400);
+  }
+
+  // 찍기 방지 3스트라이크 1분 쿨타임 잠금 (빨간색 표시 및 타이머 활성화)
+  setRegionLockout(regionId, isLocked, remainingSeconds = 60) {
+    const el = this.domCache ? this.domCache[regionId] : null;
+    const node = el ? el.node : document.getElementById(`region-node-${regionId}`);
+    const badge = el ? el.lockoutBadge : document.getElementById(`lockout-badge-${regionId}`);
+    const text = el ? el.lockoutText : document.getElementById(`lockout-text-${regionId}`);
+    if (!node) return;
+
+    if (isLocked) {
+      node.classList.add('is-locked-region');
+      if (badge) badge.style.display = 'block';
+      if (text) text.textContent = `🔒 ${remainingSeconds}s`;
+    } else {
+      node.classList.remove('is-locked-region');
+      if (badge) badge.style.display = 'none';
+      // 잠금 해제 시 원래 소유자/중립 상태 색상으로 복원
+      const currentData = this.getRegion(regionId);
+      this.updateSingleRegion(currentData);
+    }
+  }
+
+  // 1분 쿨타임 남은 초 텍스트 갱신
+  updateLockoutTimer(regionId, remainingSeconds) {
+    const el = this.domCache ? this.domCache[regionId] : null;
+    const text = el ? el.lockoutText : document.getElementById(`lockout-text-${regionId}`);
+    if (text) {
+      text.textContent = `🔒 ${remainingSeconds}s`;
+    }
   }
 }
 

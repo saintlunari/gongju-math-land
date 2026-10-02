@@ -78,7 +78,7 @@ function handleTeacherRegionClick(regionId, data, allowToggle = true) {
 
   if (shieldEl) {
     if (isConquered) {
-      shieldEl.textContent = `레벨 ${regInfo.shield || 1} / 3`;
+      shieldEl.textContent = `레벨 ${regInfo.shield || 1} / 5 (최대 5)`;
       shieldEl.style.color = (regInfo.shield >= 3) ? '#F59E0B' : '#38BDF8';
     } else {
       shieldEl.textContent = '방어막 없음';
@@ -190,6 +190,8 @@ function initSocket() {
       window.soundManager.playConquer();
     } else if (data.event === 'defended') {
       window.soundManager.playShield();
+    } else if (data.event === 'attacked') {
+      window.soundManager.playWrong();
     }
   });
 

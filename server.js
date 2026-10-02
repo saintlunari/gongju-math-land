@@ -88,6 +88,9 @@ let gameState = {
   }
 };
 
+// 학생별 찍기 방지 1분 쿨타임 잠금 관리 (socketId -> { regionId: unlockTimestamp })
+const playerLockouts = {};
+
 // 지역 상태 초기화
 function resetRegions() {
   gameState.regions = {};
@@ -304,7 +307,16 @@ io.on('connection', (socket) => {
   });
 
   // 퀴즈 요청 (어떤 땅을 선택했을 때)
+  // 퀴즈 요청 (어떤 땅을 선택했을 때)
   socket.on('request_quiz', ({ regionId }) => {
+    // 3스트라이크 오답 쿨타임(1분) 잠금 검사
+    const lockedUntil = playerLockouts[socket.id]?.[regionId];
+    if (lockedUntil && lockedUntil > Date.now()) {
+      const remainSec = Math.ceil((lockedUntil - Date.now()) / 1000);
+      socket.emit('challenge_locked', { regionId, remainSec });
+      return;
+    }
+
     const region = gameState.regions[regionId];
     if (!region) return;
 
@@ -332,6 +344,13 @@ io.on('connection', (socket) => {
     });
   });
 
+  // 찍기 방지 3스트라이크 1분 쿨타임 등록
+  socket.on('trigger_region_lockout', ({ regionId }) => {
+    if (!regionId) return;
+    if (!playerLockouts[socket.id]) playerLockouts[socket.id] = {};
+    playerLockouts[socket.id][regionId] = Date.now() + 60000;
+  });
+
   // 퀴즈 문제 1개 풀이 완료 기록
   socket.on('solve_single_quiz', ({ isCorrect }) => {
     const player = gameState.players[socket.id];
@@ -346,7 +365,11 @@ io.on('connection', (socket) => {
   });
 
   // 영토 정복/방어 세트 완료
-  socket.on('complete_quiz_challenge', ({ regionId, success }) => {
+  socket.on('complete_quiz_challenge', ({ regionId, success, bonusShield }) => {
+    // 잠금 상태인 경우 무시
+    const lockedUntil = playerLockouts[socket.id]?.[regionId];
+    if (lockedUntil && lockedUntil > Date.now()) return;
+
     const region = gameState.regions[regionId];
     const player = gameState.players[socket.id];
     if (!region || !player || !success) return;
@@ -432,6 +455,14 @@ io.on('connection', (socket) => {
         noticeText = (isTeamMode && team)
           ? `⚡ [${team.name}]의 [${player.name}] 학생이 [${oldOwnerName}]의 [${region.name}]을 빼앗았습니다!${chainSuffix}`
           : `⚡ [${player.name}] 학생이 [${oldOwnerName}] 학생의 [${region.name}]을 빼앗았습니다!${chainSuffix}`;
+      }
+    }
+
+    // 황금 방패 아이템 사용 시 추가 방어막 +1 부여
+    if (bonusShield && (eventType === 'conquered' || eventType === 'captured' || eventType === 'defended')) {
+      if (region.shield < gameState.settings.maxShield) {
+        region.shield += 1;
+        noticeText += ' 🛡️ [황금 방패로 방어막 +1 추가 강화!]';
       }
     }
 
@@ -535,6 +566,7 @@ io.on('connection', (socket) => {
 
   // 연결 종료
   socket.on('disconnect', () => {
+    delete playerLockouts[socket.id];
     if (gameState.players[socket.id]) {
       console.log(`[퇴장] ${gameState.players[socket.id].name}`);
       delete gameState.players[socket.id];
