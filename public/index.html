@@ -28,6 +28,13 @@
       🏰 <span>공주시</span> 땅따먹기
     </div>
 
+    <!-- 주간 시즌제 정보 & 명예의 전당 (학생 화면) -->
+    <div class="header-season-bar" style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+      <span class="season-badge" id="student-season-title" style="background: linear-gradient(135deg, #F59E0B, #D97706); color: white; padding: 4px 10px; border-radius: 12px; font-weight: 800; font-size: 0.85rem; white-space: nowrap;">👑 제 1시즌</span>
+      <span id="student-season-dday" style="font-size: 0.8rem; color: #0284C7; font-weight: bold; white-space: nowrap;">⏳ 일요일 23:59 리셋 (계산 중...)</span>
+      <button id="btn-student-hof" style="background: #F1F5F9; border: 1.5px solid #CBD5E1; color: #334155; padding: 4px 10px; border-radius: 10px; font-size: 0.8rem; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 4px; white-space: nowrap;">🏆 명예의 전당</button>
+    </div>
+
     <!-- 실시간 연속 콤보 & 연계 보너스 뱃지 HUD -->
     <div style="display: flex; gap: 6px; align-items: center;">
       <div class="streak-badge-hud" id="hud-streak-badge" style="display: none;">
@@ -158,25 +165,25 @@
         <input type="text" id="input-student-name" class="input-text" placeholder="예: 2학년 김민준" maxlength="8" autofocus>
       </div>
 
-      <!-- 모둠 대항전일 때 표시되는 모둠 선택 그리드 -->
+      <!-- 반 대항전일 때 표시되는 학급(반) 선택 그리드 -->
       <div class="form-group" id="team-select-group" style="display: none;">
-        <label class="form-label">참가할 모둠 고르기 (4개 모둠 대항전)</label>
+        <label class="form-label">우리 반 선택하기 (2학년 1반 ~ 4반 대항전)</label>
         <div class="team-grid" id="team-grid">
           <div class="team-item active" data-team="team_1" style="border-color: #2563EB;">
-            <span class="team-avatar">🐉</span>
-            <span class="team-name">1모둠 청룡</span>
+            <span class="team-avatar">1️⃣</span>
+            <span class="team-name">2학년 1반</span>
           </div>
           <div class="team-item" data-team="team_2" style="border-color: #EA580C;">
-            <span class="team-avatar">🐯</span>
-            <span class="team-name">2모둠 백호</span>
+            <span class="team-avatar">2️⃣</span>
+            <span class="team-name">2학년 2반</span>
           </div>
           <div class="team-item" data-team="team_3" style="border-color: #DC2626;">
-            <span class="team-avatar">🦅</span>
-            <span class="team-name">3모둠 주작</span>
+            <span class="team-avatar">3️⃣</span>
+            <span class="team-name">2학년 3반</span>
           </div>
           <div class="team-item" data-team="team_4" style="border-color: #16A34A;">
-            <span class="team-avatar">🐢</span>
-            <span class="team-name">4모둠 현무</span>
+            <span class="team-avatar">4️⃣</span>
+            <span class="team-name">2학년 4반</span>
           </div>
         </div>
       </div>
@@ -286,6 +293,34 @@
       <h2 class="badge-modal-title" id="badge-modal-name" style="font-size: 1.7rem; margin: 10px 0; color: #1E293B;">공산성 수호자</h2>
       <p class="badge-modal-desc" id="badge-modal-desc" style="font-size: 0.95rem; color: #64748B; margin-bottom: 22px; line-height: 1.5;">백제 웅진 천도 수도 공산성을 지키는 명예 수호자!</p>
       <button class="btn-primary" id="btn-close-badge-modal">자랑스럽게 뱃지 받기! 🌟</button>
+    </div>
+  </div>
+
+  <!-- =======================================================
+       4. 학생용 명예의 전당 모달 (역대 시즌 우승반 기록)
+       ======================================================= -->
+  <div class="modal-overlay" id="student-hof-modal" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.85); z-index: 2000; align-items: center; justify-content: center;">
+    <div class="modal-card" style="background: #FFFFFF; border: 3px solid #F59E0B; border-radius: 24px; padding: 22px; max-width: 480px; width: 92%; max-height: 85vh; display: flex; flex-direction: column; box-shadow: 0 20px 40px rgba(0,0,0,0.3);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; border-bottom: 2px solid #F1F5F9; padding-bottom: 10px;">
+        <h2 style="color: #D97706; font-size: 1.35rem; display: flex; align-items: center; gap: 8px;">🏆 역대 시즌 명예의 전당</h2>
+        <button id="btn-close-student-hof" style="background: none; border: none; color: #64748B; font-size: 1.5rem; cursor: pointer; padding: 4px 8px;">✕</button>
+      </div>
+      <div id="student-hof-list" style="overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 12px; padding-right: 4px;">
+        <!-- 시즌별 우승 카드 동적 렌더링 -->
+      </div>
+    </div>
+  </div>
+
+  <!-- =======================================================
+       5. 시즌 마감 & 새 시즌 개막 축하 모달
+       ======================================================= -->
+  <div class="modal-overlay" id="season-conclude-modal" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.9); z-index: 2500; align-items: center; justify-content: center;">
+    <div class="modal-card" style="text-align: center; max-width: 420px; width: 92%; background: white; border: 4px solid #F59E0B; border-radius: 24px; padding: 28px; box-shadow: 0 25px 50px rgba(0,0,0,0.4);">
+      <div style="font-size: 4rem; margin-bottom: 8px;">👑</div>
+      <h2 id="conclude-modal-title" style="color: #D97706; font-size: 1.5rem; margin-bottom: 8px;">제 1시즌 마감!</h2>
+      <div id="conclude-modal-winner" style="font-size: 1.4rem; font-weight: 900; color: #2563EB; margin: 12px 0;">🥇 2학년 1반 최종 우승!</div>
+      <p id="conclude-modal-desc" style="color: #64748B; font-size: 0.95rem; margin-bottom: 22px; line-height: 1.5;">한 주간의 치열한 영토 대항전이 종료되었습니다.<br>새로운 시즌이 시작되어 150개 영토가 리셋되었습니다!</p>
+      <button class="btn-primary" id="btn-close-conclude-modal" style="width: 100%;">새 시즌 정복하러 가기! 🚀</button>
     </div>
   </div>
 

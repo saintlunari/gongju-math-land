@@ -31,6 +31,15 @@
         <button id="btn-timer-reset" class="btn-ctrl btn-reset">🔄 리셋</button>
       </div>
     </div>
+
+    <!-- 주간 일요일 초기화 시즌제 정보 -->
+    <div class="header-season-box" style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
+      <div style="display: flex; gap: 8px; align-items: center;">
+        <span class="season-badge" id="teacher-season-title" style="background: linear-gradient(135deg, #F59E0B, #D97706); color: white; padding: 4px 12px; border-radius: 12px; font-weight: 800; font-size: 0.95rem;">👑 제 1시즌 (2학년 반 대항전)</span>
+        <button id="btn-open-hall-of-fame" class="btn-ctrl" style="background: #475569; font-size: 0.85rem; padding: 4px 10px;">🏆 명예의 전당</button>
+      </div>
+      <span id="teacher-season-dday" style="font-size: 0.8rem; color: #38BDF8; font-weight: 600;">⏳ 매주 일요일 밤 23:59 리셋 (계산 중...)</span>
+    </div>
   </header>
 
   <!-- 실시간 속보 전광판 -->
@@ -76,17 +85,17 @@
           <span id="mode-badge" style="font-size: 0.75rem; background: #3B82F6; color: white; padding: 2px 8px; border-radius: 10px;">개인전</span>
         </div>
 
-        <!-- 모둠 대항전 전용 4색 실시간 점유율 바 -->
+        <!-- 반 대항전 전용 4색 실시간 점유율 바 -->
         <div id="team-share-container" style="display: none; margin: 12px 0;">
           <div style="font-size: 0.8rem; color: #94A3B8; margin-bottom: 6px; display: flex; justify-content: space-between;">
-            <span>모둠별 공주시 영토 점유율</span>
+            <span>반별 공주시 영토 점유율 (1반~4반)</span>
             <span id="conquered-total-ratio">0 / 150곳</span>
           </div>
           <div class="team-progress-bar" style="height: 14px; background: #334155; border-radius: 7px; overflow: hidden; display: flex;">
-            <div id="bar-team-1" style="width: 0%; background: #2563EB; transition: width 0.3s;" title="1모둠 청룡"></div>
-            <div id="bar-team-2" style="width: 0%; background: #EA580C; transition: width 0.3s;" title="2모둠 백호"></div>
-            <div id="bar-team-3" style="width: 0%; background: #DC2626; transition: width 0.3s;" title="3모둠 주작"></div>
-            <div id="bar-team-4" style="width: 0%; background: #16A34A; transition: width 0.3s;" title="4모둠 현무"></div>
+            <div id="bar-team-1" style="width: 0%; background: #2563EB; transition: width 0.3s;" title="2학년 1반"></div>
+            <div id="bar-team-2" style="width: 0%; background: #EA580C; transition: width 0.3s;" title="2학년 2반"></div>
+            <div id="bar-team-3" style="width: 0%; background: #DC2626; transition: width 0.3s;" title="2학년 3반"></div>
+            <div id="bar-team-4" style="width: 0%; background: #16A34A; transition: width 0.3s;" title="2학년 4반"></div>
           </div>
         </div>
 
@@ -105,7 +114,7 @@
           <label style="font-size: 0.85rem; color: #94A3B8; display: block; margin-bottom: 4px;">🎮 대전 방식 (모드 전환)</label>
           <select id="select-game-mode" class="select-control" style="font-weight: bold; background: #1E293B; border-color: #3B82F6;">
             <option value="individual">👤 개인전 (자유 땅따먹기 경쟁)</option>
-            <option value="team">🐉 4개 모둠 대항전 (청룡·백호·주작·현무)</option>
+            <option value="team">🏫 2학년 반 대항전 (1반 ~ 4반)</option>
           </select>
         </div>
 
@@ -138,12 +147,30 @@
           </select>
         </div>
 
-        <button id="btn-reset-regions" class="btn-action-full">🧹 모든 영토 초기화 (새 게임)</button>
+        <div style="margin-top: 14px; padding-top: 10px; border-top: 1px dashed #475569;">
+          <div style="font-size: 0.85rem; color: #94A3B8; margin-bottom: 6px; font-weight: bold;">🗓️ 시즌제 운영 (매주 일요일 초기화)</div>
+          <button id="btn-conclude-season" class="btn-ctrl" style="width: 100%; background: #8B5CF6; font-size: 0.9rem; padding: 10px; border-radius: 10px;">🏆 이번 시즌 마감 & 새 시즌 시작</button>
+        </div>
+
+        <button id="btn-reset-regions" class="btn-action-full" style="margin-top: 12px;">🧹 현재 영토만 초기화 (점수 유지)</button>
       </div>
 
     </aside>
 
   </main>
+
+  <!-- 명예의 전당 모달 (역대 시즌 우승반 기록) -->
+  <div class="modal-overlay" id="hall-of-fame-modal" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.85); z-index: 2000; align-items: center; justify-content: center;">
+    <div class="modal-card" style="background: #1E293B; border: 3px solid #F59E0B; border-radius: 20px; padding: 24px; max-width: 540px; width: 92%; max-height: 85vh; display: flex; flex-direction: column; box-shadow: 0 20px 40px rgba(0,0,0,0.5);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 2px solid #334155; padding-bottom: 12px;">
+        <h2 style="color: #FCD34D; font-size: 1.5rem; display: flex; align-items: center; gap: 8px;">🏆 역대 시즌 명예의 전당</h2>
+        <button id="btn-close-hof" style="background: none; border: none; color: #94A3B8; font-size: 1.5rem; cursor: pointer;">✕</button>
+      </div>
+      <div id="hof-list-container" style="overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 12px; padding-right: 4px;">
+        <!-- 시즌별 우승 카드 동적 렌더링 -->
+      </div>
+    </div>
+  </div>
 
   <!-- 사운드 및 스크립트 -->
   <script src="/js/sound.js"></script>

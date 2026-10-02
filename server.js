@@ -4,9 +4,13 @@ const { Server } = require('socket.io');
 const os = require('os');
 const QRCode = require('qrcode');
 const { validateQuestionBank, getQuestionsForRegion } = require('./question_bank');
+const { SeasonManager } = require('./season_manager');
 
 // 서버 시작 시 문제 은행 100% 무결성 검증 (불변식 검사)
 validateQuestionBank();
+
+// 주간 일요일 초기화 시즌 매니저 인스턴스 생성
+const seasonManager = new SeasonManager();
 
 const app = express();
 const server = http.createServer(app);
@@ -37,12 +41,12 @@ const localIp = getLocalIpAddress();
 // 공주시 150개 영토 정의 (16개 읍·면·동 전역의 모든 법정동 및 법정리)
 const INITIAL_REGIONS = require('./public/data/server_initial_regions.json');
 
-// 4개 모둠 대항전 팀 정의
+// 2학년 반 대항전 (1반 ~ 4반) 팀 정의
 const TEAMS = {
-  team_1: { id: 'team_1', name: '1모둠 청룡', avatar: '🐉', color: '#2563EB', textColor: '#FFFFFF', desc: '용맹한 푸른 용' },
-  team_2: { id: 'team_2', name: '2모둠 백호', avatar: '🐯', color: '#EA580C', textColor: '#FFFFFF', desc: '날쌘 하얀 호랑이' },
-  team_3: { id: 'team_3', name: '3모둠 주작', avatar: '🦅', color: '#DC2626', textColor: '#FFFFFF', desc: '불꽃의 붉은 봉황' },
-  team_4: { id: 'team_4', name: '4모둠 현무', avatar: '🐢', color: '#16A34A', textColor: '#FFFFFF', desc: '지혜로운 초록 거북' }
+  team_1: { id: 'team_1', name: '2학년 1반', shortName: '1반', avatar: '1️⃣', color: '#2563EB', textColor: '#FFFFFF', desc: '지혜롭고 씩씩한 1반' },
+  team_2: { id: 'team_2', name: '2학년 2반', shortName: '2반', avatar: '2️⃣', color: '#EA580C', textColor: '#FFFFFF', desc: '열정 가득 활기찬 2반' },
+  team_3: { id: 'team_3', name: '2학년 3반', shortName: '3반', avatar: '3️⃣', color: '#DC2626', textColor: '#FFFFFF', desc: '용기 있고 당당한 3반' },
+  team_4: { id: 'team_4', name: '2학년 4반', shortName: '4반', avatar: '4️⃣', color: '#16A34A', textColor: '#FFFFFF', desc: '단합 최고 멋진 4반' }
 };
 
 // 백제 공주 대표 명소 특별 뱃지 정의 (150개 실제 영토 ID 매핑)
@@ -60,7 +64,7 @@ const HERITAGE_BADGES = {
 let gameState = {
   status: 'playing', // 'ready', 'playing', 'paused', 'ended'
   settings: {
-    gameMode: 'individual', // 'individual' (개인전) | 'team' (모둠 대항전)
+    gameMode: 'individual', // 'individual' (개인전) | 'team' (반 대항전)
     danRange: 'all', // '2to5', '6to9', 'all'
     conceptMode: 'all', // 'all', 'visual', 'concept', 'formula'
     inputMode: 'both', // 'keypad', 'multiple', 'both'
@@ -93,6 +97,7 @@ function resetRegions() {
       ownerColor: null,
       ownerAvatar: null,
       capturedBy: null, // 실제 문제를 맞힌 학생 이름
+      capturedById: null,
       shield: 0, // 0 = 중립, 1~5 = 방어막
       isUnderAttack: false
     };
@@ -164,7 +169,7 @@ function resetTimer(seconds = 600) {
   io.emit('timer_reset', { remainingSeconds: seconds });
 }
 
-// 랭킹 계산 (개인전: 개인별 / 팀전: 모둠별 + 개인 기여도)
+// 랭킹 계산 (개인전: 개인별 / 반 대항전: 학급별 + 개인 기여도)
 function calculateRanking() {
   const isTeamMode = gameState.settings.gameMode === 'team';
 
@@ -184,12 +189,13 @@ function calculateRanking() {
     };
   });
 
-  // 2. 모둠(팀) 정보 매핑
+  // 2. 반(학급) 정보 매핑
   const teamMap = {};
   Object.values(TEAMS).forEach(t => {
     teamMap[t.id] = {
       id: t.id,
       name: t.name,
+      shortName: t.shortName,
       avatar: t.avatar,
       color: t.color,
       desc: t.desc,
@@ -218,6 +224,10 @@ function calculateRanking() {
       if (teamMap[r.ownerId]) {
         teamMap[r.ownerId].territories++;
         teamMap[r.ownerId].totalShield += r.shield;
+      }
+      // 반 대항전 모드일 때 해당 땅을 우리 반을 위해 정복한 학생 개인 기여도 합산
+      if (isTeamMode && r.capturedById && playerMap[r.capturedById]) {
+        playerMap[r.capturedById].territories++;
       }
     }
   });
@@ -265,6 +275,7 @@ io.on('connection', (socket) => {
       qrDataUrl,
       gameState,
       teams: TEAMS,
+      season: seasonManager.getSeasonInfo(),
       ranking: calculateRanking()
     });
   });
@@ -291,11 +302,12 @@ io.on('connection', (socket) => {
 
     console.log(`[학생 입장] ${player.name} (${player.avatar}, ${player.color}, team: ${player.teamId || '개인'})`);
 
-    // 개인에게 입장 성공 전송
+    // 개인에게 입장 성공 전송 (시즌 정보 포함)
     socket.emit('joined_success', {
       player,
       gameState,
-      teams: TEAMS
+      teams: TEAMS,
+      season: seasonManager.getSeasonInfo()
     });
 
     // 전체에게 상태 갱신 방송
@@ -309,6 +321,13 @@ io.on('connection', (socket) => {
       text: (isTeamMode && team) 
         ? `🎉 [${team.name}]에 [${player.name}] 학생이 합류했습니다!`
         : `🎉 [${player.name}] 학생이 입장했습니다!`
+    });
+  });
+
+  // 역대 명예의 전당 요청
+  socket.on('request_hall_of_fame', () => {
+    socket.emit('hall_of_fame_data', {
+      hallOfFame: seasonManager.data.hallOfFame || []
     });
   });
 
@@ -378,7 +397,7 @@ io.on('connection', (socket) => {
     let newlyUnlockedBadge = null;
 
     if (isOwner) {
-      // 1. 자기 땅 (또는 우리 모둠 땅) 방어력 강화
+      // 1. 자기 땅 (또는 우리 반 땅) 방어력 강화
       if (region.shield < gameState.settings.maxShield) {
         region.shield += 1;
       }
@@ -397,6 +416,7 @@ io.on('connection', (socket) => {
       region.ownerColor = effectiveOwnerColor;
       region.ownerAvatar = effectiveOwnerAvatar;
       region.capturedBy = player.name;
+      region.capturedById = player.id;
       region.shield = 1;
 
       // 영토 연계 보너스 검사 (+20점)
@@ -427,6 +447,7 @@ io.on('connection', (socket) => {
         region.ownerColor = effectiveOwnerColor;
         region.ownerAvatar = effectiveOwnerAvatar;
         region.capturedBy = player.name;
+        region.capturedById = player.id;
         region.shield = 1;
 
         isChained = checkTerritoryChain(regionId, effectiveOwnerId);
@@ -511,7 +532,7 @@ io.on('connection', (socket) => {
         });
         io.emit('broadcast_notice', {
           type: 'mode_change',
-          text: `📢 게임 모드가 [${gameState.settings.gameMode === 'team' ? '4개 모둠 대항전' : '개인전'}]으로 전환되었습니다!`
+          text: `📢 게임 모드가 [${gameState.settings.gameMode === 'team' ? '2학년 반 대항전 (1~4반)' : '개인전'}]으로 전환되었습니다!`
         });
         break;
 
@@ -531,6 +552,25 @@ io.on('connection', (socket) => {
         resetRegions();
         io.emit('game_reset_full', { gameState });
         break;
+
+      case 'conclude_season':
+        const record = seasonManager.concludeSeasonAndStartNew(gameState, calculateRanking);
+        resetRegions();
+        io.emit('season_ended_and_reset', {
+          finishedSeason: record,
+          newSeason: seasonManager.getSeasonInfo(),
+          regions: gameState.regions,
+          ranking: calculateRanking()
+        });
+        io.emit('broadcast_notice', {
+          type: 'season',
+          text: `🏆 [제 ${record.season}시즌 마감] 우승: [${record.winningClass.name}]! 새 시즌이 시작되었습니다!`
+        });
+        break;
+
+      case 'get_hall_of_fame':
+        socket.emit('hall_of_fame_data', { hallOfFame: seasonManager.data.hallOfFame || [] });
+        break;
     }
   });
 
@@ -546,6 +586,26 @@ io.on('connection', (socket) => {
     }
   });
 });
+
+// 매 10초마다 일요일 시즌 마감 자동 검사 & 시즌 타이머 틱 동기화
+setInterval(() => {
+  const expiredRecord = seasonManager.checkAndInitSeason(gameState, calculateRanking);
+  if (expiredRecord) {
+    resetRegions();
+    io.emit('season_ended_and_reset', {
+      finishedSeason: expiredRecord,
+      newSeason: seasonManager.getSeasonInfo(),
+      regions: gameState.regions,
+      ranking: calculateRanking()
+    });
+    io.emit('broadcast_notice', {
+      type: 'season',
+      text: `🏆 [제 ${expiredRecord.season}시즌 정기 마감] 우승: [${expiredRecord.winningClass.name}]! 새로운 ${seasonManager.data.seasonName}이 시작되었습니다!`
+    });
+  } else {
+    io.emit('season_tick', seasonManager.getSeasonInfo());
+  }
+}, 10000);
 
 // 서버 기동
 server.listen(PORT, '0.0.0.0', () => {

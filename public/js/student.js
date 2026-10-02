@@ -16,10 +16,10 @@ let myProfile = {
 
 let serverGameMode = 'individual'; // 'individual' or 'team'
 let serverTeams = {
-  team_1: { id: 'team_1', name: '1모둠 청룡', avatar: '🐉', color: '#2563EB' },
-  team_2: { id: 'team_2', name: '2모둠 백호', avatar: '🐯', color: '#EA580C' },
-  team_3: { id: 'team_3', name: '3모둠 주작', avatar: '🦅', color: '#DC2626' },
-  team_4: { id: 'team_4', name: '4모둠 현무', avatar: '🐢', color: '#16A34A' }
+  team_1: { id: 'team_1', name: '2학년 1반', shortName: '1반', avatar: '1️⃣', color: '#2563EB' },
+  team_2: { id: 'team_2', name: '2학년 2반', shortName: '2반', avatar: '2️⃣', color: '#EA580C' },
+  team_3: { id: 'team_3', name: '2학년 3반', shortName: '3반', avatar: '3️⃣', color: '#DC2626' },
+  team_4: { id: 'team_4', name: '2학년 4반', shortName: '4반', avatar: '4️⃣', color: '#16A34A' }
 };
 
 let myStats = {
@@ -60,13 +60,13 @@ document.addEventListener('DOMContentLoaded', () => {
   initItemsAndBadges();
 });
 
-// 1. 로비 초기화 (프로필 및 모둠 설정)
+// 1. 로비 초기화 (프로필 및 반 설정)
 function initLobby() {
   const avatarGrid = document.getElementById('avatar-grid');
   const colorGrid = document.getElementById('color-grid');
   const teamGrid = document.getElementById('team-grid');
 
-  // 모둠 선택 그리드 클릭 이벤트
+  // 학급(반) 선택 그리드 클릭 이벤트
   if (teamGrid) {
     teamGrid.addEventListener('click', (e) => {
       const item = e.target.closest('.team-item');
@@ -118,7 +118,7 @@ function initLobby() {
     const name = nameInput.value.trim() || `학생${Math.floor(Math.random() * 90 + 10)}`;
     myProfile.name = name;
 
-    // 모둠전 모드일 때 모둠 기본 색상/아바타 자동 반영
+    // 반 대항전 모드일 때 해당 반 기본 색상/아바타 자동 반영
     if (serverGameMode === 'team' && serverTeams[myProfile.teamId]) {
       const t = serverTeams[myProfile.teamId];
       myProfile.avatar = t.avatar;
@@ -147,7 +147,7 @@ function updateProfileUI() {
   if (serverGameMode === 'team' && serverTeams[myProfile.teamId]) {
     const t = serverTeams[myProfile.teamId];
     nameDisplay.innerHTML = `<span style="color:${t.color}; font-weight:800;">[${t.name}]</span> ${myProfile.name}`;
-    if (territoryLabel) territoryLabel.innerHTML = `🚩 우리 모둠 땅: <b id="my-territory-count">0</b>곳`;
+    if (territoryLabel) territoryLabel.innerHTML = `🚩 우리 반 땅: <b id="my-territory-count">0</b>곳`;
   } else {
     nameDisplay.textContent = myProfile.name;
     if (territoryLabel) territoryLabel.innerHTML = `🚩 내 땅: <b id="my-territory-count">0</b>곳`;
@@ -425,7 +425,7 @@ function initMapControls() {
     const myRegions = Object.values(gongjuMap.regionsData).filter(r => r.ownerId === targetOwnerId);
     if (myRegions.length > 0) {
       gongjuMap.focusRegion(myRegions[0].id);
-      showTicker(`🏠 ${serverGameMode === 'team' ? '우리 모둠' : '내'} 영토 [${myRegions[0].name}]로 이동했습니다!`);
+      showTicker(`🏠 ${serverGameMode === 'team' ? '우리 반' : '내'} 영토 [${myRegions[0].name}]로 이동했습니다!`);
     } else {
       showTicker('🚩 아직 차지한 땅이 없어요! 빈 땅을 눌러 문제를 풀어보세요!');
     }
@@ -705,6 +705,30 @@ socket.on('joined_success', (data) => {
   if (data.teams) serverTeams = data.teams;
   adaptGameModeUI(serverGameMode);
   gongjuMap.updateRegions(data.gameState.regions);
+  if (data.season) {
+    updateStudentSeasonDisplay(data.season);
+  }
+});
+
+// 시즌 실시간 틱 수신
+socket.on('season_tick', (seasonInfo) => {
+  updateStudentSeasonDisplay(seasonInfo);
+});
+
+// 시즌 정기/수동 마감 및 새 시즌 개막
+socket.on('season_ended_and_reset', (data) => {
+  gongjuMap.updateRegions(data.regions);
+  updateStudentSeasonDisplay(data.newSeason);
+
+  document.getElementById('my-territory-count').textContent = '0';
+  showSeasonConcludeModal(data.finishedSeason, data.newSeason);
+  fireConfetti();
+  window.soundManager.playConquer();
+});
+
+// 명예의 전당 데이터 수신
+socket.on('hall_of_fame_data', (data) => {
+  renderStudentHallOfFame(data.hallOfFame || []);
 });
 
 socket.on('region_updated', (data) => {
@@ -721,7 +745,7 @@ socket.on('game_mode_changed', (data) => {
   serverGameMode = data.gameMode;
   gongjuMap.updateRegions(data.regions);
   adaptGameModeUI(data.gameMode);
-  showTicker(`📢 게임 모드가 [${data.gameMode === 'team' ? '4개 모둠 대항전' : '개인전'}]으로 전환되었습니다!`);
+  showTicker(`📢 게임 모드가 [${data.gameMode === 'team' ? '2학년 반 대항전 (1~4반)' : '개인전'}]으로 전환되었습니다!`);
 });
 
 socket.on('challenge_result', (data) => {
@@ -773,3 +797,108 @@ function showTicker(msg) {
     ticker.style.backgroundColor = '#FFF3E0';
   }, 1800);
 }
+
+// 학생 상단 시즌 및 D-Day 타이머 갱신
+function updateStudentSeasonDisplay(season) {
+  if (!season) return;
+  const titleEl = document.getElementById('student-season-title');
+  const ddayEl = document.getElementById('student-season-dday');
+
+  if (titleEl) {
+    titleEl.textContent = `👑 제 ${season.currentSeason}시즌`;
+  }
+  if (ddayEl) {
+    ddayEl.textContent = `⏳ 일요일 23:59 리셋 (${season.remainingFormatted || '계산 중...'})`;
+  }
+}
+
+// 학생 명예의 전당 모달 열기 및 렌더링
+function renderStudentHallOfFame(hallOfFame) {
+  const modal = document.getElementById('student-hof-modal');
+  const container = document.getElementById('student-hof-list');
+  if (!modal || !container) return;
+
+  if (!hallOfFame || hallOfFame.length === 0) {
+    container.innerHTML = `
+      <div style="text-align: center; color: #64748B; padding: 36px 12px;">
+        <div style="font-size: 3rem; margin-bottom: 8px;">🏆</div>
+        <div style="font-size: 1.05rem; font-weight: bold; color: #1E293B; margin-bottom: 4px;">아직 마감된 시즌 기록이 없습니다.</div>
+        <div style="font-size: 0.85rem;">이번 주 일요일 밤 23:59:59에 첫 번째 우승반이 탄생합니다! 열심히 땅을 넓혀보세요!</div>
+      </div>
+    `;
+  } else {
+    container.innerHTML = hallOfFame.map((record) => {
+      const winner = record.winningClass || { name: '집계 없음', avatar: '🏫', color: '#3B82F6', territories: 0, score: 0 };
+      const endedDate = record.endedAt ? new Date(record.endedAt).toLocaleDateString('ko-KR') : '';
+
+      return `
+        <div style="background: #F8FAFC; border: 2px solid #F59E0B; border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 8px;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-weight: 800; font-size: 1rem; color: #D97706;">👑 제 ${record.season}시즌 우승</span>
+            <span style="font-size: 0.75rem; color: #94A3B8;">${endedDate} 마감</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 10px; background: white; border-radius: 10px; padding: 10px; border: 1px solid #E2E8F0;">
+            <span style="font-size: 1.8rem;">${winner.avatar || '🏫'}</span>
+            <div style="flex: 1;">
+              <div style="font-size: 1.1rem; font-weight: 900; color: ${winner.color || '#2563EB'};">${winner.name}</div>
+              <div style="font-size: 0.8rem; color: #475569; margin-top: 2px;">
+                🚩 점령한 땅: <b>${winner.territories}곳</b> / 150곳 | ⭐ 점수: <b>${winner.score}점</b>
+              </div>
+            </div>
+          </div>
+          ${record.mvpStudent && record.mvpStudent.name !== '집계 없음' ? `
+            <div style="font-size: 0.75rem; color: #0284C7; background: #E0F2FE; padding: 5px 8px; border-radius: 6px;">
+              🎖️ <b>시즌 MVP:</b> ${record.mvpStudent.name} (${record.mvpStudent.territories}곳 점령, ${record.mvpStudent.score}점)
+            </div>
+          ` : ''}
+        </div>
+      `;
+    }).join('');
+  }
+
+  modal.style.display = 'flex';
+}
+
+// 시즌 종료 팝업 모달 표시
+function showSeasonConcludeModal(finishedSeason, newSeason) {
+  const modal = document.getElementById('season-conclude-modal');
+  const title = document.getElementById('conclude-modal-title');
+  const winner = document.getElementById('conclude-modal-winner');
+  const desc = document.getElementById('conclude-modal-desc');
+
+  if (!modal) return;
+
+  if (title) title.textContent = `👑 제 ${finishedSeason.season}시즌 마감!`;
+  if (winner) {
+    const w = finishedSeason.winningClass || { name: '집계 완료' };
+    winner.innerHTML = `🥇 <span style="color:${w.color || '#2563EB'}">${w.name}</span> 최종 우승!`;
+  }
+  if (desc) {
+    desc.innerHTML = `한 주간의 치열했던 영토 대항전이 종료되었습니다!<br>새로운 <b>${newSeason.seasonName || `제 ${newSeason.currentSeason}시즌`}</b>이 시작되어 모든 영토가 0으로 리셋되었습니다!`;
+  }
+
+  modal.style.display = 'flex';
+}
+
+// 시즌 관련 학생 버튼 이벤트 리스너
+document.addEventListener('DOMContentLoaded', () => {
+  // 명예의 전당 열기
+  document.getElementById('btn-student-hof')?.addEventListener('click', () => {
+    window.soundManager.playClick();
+    socket.emit('request_hall_of_fame');
+  });
+
+  // 명예의 전당 닫기
+  document.getElementById('btn-close-student-hof')?.addEventListener('click', () => {
+    window.soundManager.playClick();
+    const modal = document.getElementById('student-hof-modal');
+    if (modal) modal.style.display = 'none';
+  });
+
+  // 시즌 종료 팝업 닫기
+  document.getElementById('btn-close-conclude-modal')?.addEventListener('click', () => {
+    window.soundManager.playClick();
+    const modal = document.getElementById('season-conclude-modal');
+    if (modal) modal.style.display = 'none';
+  });
+});
