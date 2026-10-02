@@ -2,6 +2,17 @@
 const socket = io();
 let teacherMap = null;
 
+// 백제 공주 명소 뱃지 메타데이터
+const HERITAGE_BADGES = {
+  'ri_127': { name: '공산성 수호자', icon: '🏰', desc: '백제 웅진 천도 수도 공산성을 지키는 명예 수호자!' },
+  'ri_131': { name: '무령왕의 후예', icon: '👑', desc: '백제 제25대 무령왕릉의 숨겨진 지혜를 계승한 왕의 후예!' },
+  'ri_51': { name: '마곡사 산신령', icon: '🌲', desc: '유네스코 세계유산 태화산 마곡사의 맑은 기운을 품은 수호자!' },
+  'ri_148': { name: '구석기 탐험대장', icon: '🪨', desc: '한국 구석기 역사의 요람 석장리 유적을 탐험한 대장!' },
+  'ri_2': { name: '수국 꽃의 요정', icon: '🌸', desc: '유구천 10만 송이 수국정원을 만발하게 만든 꽃의 요정!' },
+  'ri_21': { name: '정안 알밤 대왕', icon: '🌰', desc: '달콤 고소한 대한민국 최고 공주 정안알밤의 지배자!' },
+  'ri_91': { name: '갑사 단풍 지킴이', icon: '🍁', desc: '춘마곡 추갑사! 계룡산의 황금빛 단풍을 수호하는 지킴이!' }
+};
+
 document.addEventListener('DOMContentLoaded', () => {
   initTeacherMap();
   initSocket();
@@ -12,10 +23,86 @@ function initTeacherMap() {
   teacherMap = new window.GongjuMap('teacher-map-container', {
     isTeacher: true,
     onRegionClick: (regionId, data) => {
-      console.log('교사 맵 클릭:', regionId, data);
-      teacherMap.setSelectedRegion(regionId);
+      handleTeacherRegionClick(regionId, data);
     }
   });
+}
+
+// 교사용 영토 팝아웃 및 상세 카드 인터랙션 핸들러
+function handleTeacherRegionClick(regionId, data, allowToggle = true) {
+  const card = document.getElementById('teacher-region-card');
+  if (!card) return;
+
+  // 같은 영토를 다시 누르면 팝아웃 해제 및 카드 닫기 (토글)
+  if (allowToggle && teacherMap.selectedRegionId === regionId && card.style.display !== 'none') {
+    teacherMap.setSelectedRegion(null);
+    card.style.display = 'none';
+    return;
+  }
+
+  // 1. 지도상에서 3D 팝아웃 및 스케일업 효과 적용
+  teacherMap.setSelectedRegion(regionId);
+
+  // 2. 영토 데이터 추출
+  const regInfo = data || teacherMap.getRegion(regionId) || {};
+  const isConquered = !!regInfo.ownerId;
+
+  // 3. 플로팅 카드 UI 요소 바인딩
+  const iconEl = document.getElementById('tr-card-icon');
+  const nameEl = document.getElementById('tr-card-name');
+  const ownerEl = document.getElementById('tr-card-owner');
+  const shieldEl = document.getElementById('tr-card-shield');
+  const playerEl = document.getElementById('tr-card-player');
+  const heritageRow = document.getElementById('tr-card-heritage-row');
+  const heritageEl = document.getElementById('tr-card-heritage');
+
+  if (iconEl) iconEl.textContent = isConquered ? (regInfo.ownerAvatar || '👑') : (regInfo.icon || '📍');
+  if (nameEl) nameEl.textContent = regInfo.fullName || `${regInfo.town || ''} ${regInfo.name || ''}`;
+
+  if (ownerEl) {
+    if (isConquered) {
+      ownerEl.textContent = `🚩 ${regInfo.ownerName} 점령`;
+      ownerEl.style.background = regInfo.ownerColor || '#2563EB';
+      ownerEl.style.color = '#FFFFFF';
+    } else {
+      ownerEl.textContent = '⚪ 아직 미점령 (자유 영토)';
+      ownerEl.style.background = '#334155';
+      ownerEl.style.color = '#94A3B8';
+    }
+  }
+
+  if (shieldEl) {
+    if (isConquered) {
+      shieldEl.textContent = `레벨 ${regInfo.shield || 1} / 3`;
+      shieldEl.style.color = (regInfo.shield >= 3) ? '#F59E0B' : '#38BDF8';
+    } else {
+      shieldEl.textContent = '방어막 없음';
+      shieldEl.style.color = '#64748B';
+    }
+  }
+
+  if (playerEl) {
+    if (regInfo.capturedBy) {
+      playerEl.textContent = `${regInfo.capturedBy} 학생`;
+      playerEl.style.color = '#F1F5F9';
+    } else {
+      playerEl.textContent = '아직 없음';
+      playerEl.style.color = '#64748B';
+    }
+  }
+
+  const heritage = HERITAGE_BADGES[regionId];
+  if (heritageRow && heritageEl) {
+    if (heritage) {
+      heritageRow.style.display = 'flex';
+      heritageEl.textContent = `${heritage.icon} ${heritage.name}`;
+      heritageEl.title = heritage.desc;
+    } else {
+      heritageRow.style.display = 'none';
+    }
+  }
+
+  card.style.display = 'flex';
 }
 
 function initSocket() {
@@ -59,6 +146,10 @@ function initSocket() {
 
   // 시즌 종료 & 새 시즌 자동/수동 리셋
   socket.on('season_ended_and_reset', (data) => {
+    teacherMap.setSelectedRegion(null);
+    const card = document.getElementById('teacher-region-card');
+    if (card) card.style.display = 'none';
+
     teacherMap.updateRegions(data.regions);
     renderRanking(data.ranking);
     updateSeasonDisplay(data.newSeason);
@@ -80,6 +171,16 @@ function initSocket() {
     teacherMap.updateSingleRegion(data.region);
     addBattleLog(data.text);
 
+    // 1. 실시간 대형 전자칠판 3D 팝아웃 애니메이션 & 황금/네온 글로우 발동
+    if (data.region && data.region.id) {
+      teacherMap.triggerRealtimePop(data.region.id, data.event);
+
+      // 2. 현재 교사 화면에 열려있는 카드 정보의 영토라면 실시간 자동 동기화
+      if (teacherMap.selectedRegionId === data.region.id) {
+        handleTeacherRegionClick(data.region.id, teacherMap.getRegion(data.region.id), false);
+      }
+    }
+
     if (data.event === 'captured' || data.event === 'conquered') {
       window.soundManager.playConquer();
     } else if (data.event === 'defended') {
@@ -89,6 +190,10 @@ function initSocket() {
 
   // 전체 영토 리셋
   socket.on('regions_reset', (data) => {
+    teacherMap.setSelectedRegion(null);
+    const card = document.getElementById('teacher-region-card');
+    if (card) card.style.display = 'none';
+
     teacherMap.updateRegions(data.regions);
     renderRanking(data.ranking);
     addBattleLog('📢 교사 권한으로 모든 영토가 깨끗하게 초기화되었습니다!');
@@ -96,6 +201,10 @@ function initSocket() {
 
   // 게임 모드 전환 이벤트 수신
   socket.on('game_mode_changed', (data) => {
+    teacherMap.setSelectedRegion(null);
+    const card = document.getElementById('teacher-region-card');
+    if (card) card.style.display = 'none';
+
     const modeSelect = document.getElementById('select-game-mode');
     if (modeSelect) modeSelect.value = data.gameMode;
     updateModeBadge(data.gameMode);
@@ -311,6 +420,21 @@ function initControls() {
     if (isConfirmed) {
       window.soundManager.playClick();
       socket.emit('teacher_control', { action: 'conclude_season' });
+    }
+  });
+
+  // 교사용 영토 팝아웃 카드 컨트롤 (닫기 및 포커스)
+  document.getElementById('tr-card-close')?.addEventListener('click', () => {
+    window.soundManager.playClick();
+    teacherMap?.setSelectedRegion(null);
+    const card = document.getElementById('teacher-region-card');
+    if (card) card.style.display = 'none';
+  });
+
+  document.getElementById('tr-btn-focus')?.addEventListener('click', () => {
+    window.soundManager.playClick();
+    if (teacherMap?.selectedRegionId) {
+      teacherMap.focusRegion(teacherMap.selectedRegionId, 360);
     }
   });
 }

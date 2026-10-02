@@ -50,6 +50,35 @@
           <button id="teacher-zoom-reset" class="pad-btn" title="전체 보기">🧭</button>
         </div>
         <div id="teacher-map-container"></div>
+
+        <!-- 영토 클릭 시 팝아웃 상세 정보 카드 (교사용) -->
+        <div class="teacher-region-card" id="teacher-region-card" style="display: none;">
+          <div class="tr-card-header">
+            <span class="tr-badge-icon" id="tr-card-icon">🏰</span>
+            <div class="tr-title-group">
+              <span class="tr-region-name" id="tr-card-name">유구읍 석남리</span>
+              <span class="tr-owner-badge" id="tr-card-owner">2학년 1반 (파란색)</span>
+            </div>
+            <button class="tr-close-btn" id="tr-card-close" title="닫기">✕</button>
+          </div>
+          <div class="tr-card-body">
+            <div class="tr-stat-row">
+              <span class="tr-label">🛡️ 방어막 상태</span>
+              <span class="tr-val" id="tr-card-shield">레벨 1</span>
+            </div>
+            <div class="tr-stat-row">
+              <span class="tr-label">👤 최근 점령 학생</span>
+              <span class="tr-val" id="tr-card-player">김민준 학생</span>
+            </div>
+            <div class="tr-stat-row" id="tr-card-heritage-row" style="display: none;">
+              <span class="tr-label">🏛️ 백제 명소 뱃지</span>
+              <span class="tr-val" id="tr-card-heritage" style="color: #F59E0B; font-weight: bold;">공산성 수호자</span>
+            </div>
+            <div class="tr-card-actions">
+              <button class="tr-btn-focus" id="tr-btn-focus">🔎 이 지역 확대 보기</button>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
 

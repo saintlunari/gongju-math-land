@@ -1763,7 +1763,7 @@ class GongjuMap {
         if (this.dragDistance > 12) return;
         window.soundManager.playClick();
         if (this.options.onRegionClick) {
-          this.options.onRegionClick(item.id, this.regionsData[item.id]);
+          this.options.onRegionClick(item.id, this.getRegion(item.id));
         }
       });
     });
@@ -1896,14 +1896,24 @@ class GongjuMap {
     }, 4000);
   }
 
+  getRegion(regionId) {
+    const meta = this.layout.find(r => r.id === regionId);
+    const state = (this.regionsData && this.regionsData[regionId]) || {};
+    return { ...meta, ...state };
+  }
+
   updateRegions(regions) {
-    this.regionsData = regions;
-    Object.values(regions).forEach(reg => {
+    this.regionsData = regions || {};
+    Object.values(regions || {}).forEach(reg => {
       this.updateSingleRegion(reg);
     });
   }
 
   updateSingleRegion(reg) {
+    if (!reg || !reg.id) return;
+    if (!this.regionsData) this.regionsData = {};
+    this.regionsData[reg.id] = reg;
+
     const pathEl = document.getElementById(`region-path-${reg.id}`);
     const auraEl = document.getElementById(`shield-aura-${reg.id}`);
     const avatarBg = document.getElementById(`avatar-bg-${reg.id}`);
@@ -1989,6 +1999,32 @@ class GongjuMap {
         selectedNode.parentElement.appendChild(selectedNode);
       }
     }
+  }
+
+  // 실시간 점령/공격 발생 시 지도상에서 3D 팝아웃 및 하이라이트 연출
+  triggerRealtimePop(regionId, eventType = 'conquered') {
+    const node = document.getElementById(`region-node-${regionId}`);
+    const selectedLayer = this.svg ? this.svg.querySelector('.selected-region-layer') : null;
+    const regionsGroup = this.svg ? this.svg.querySelector('.regions-group') : null;
+
+    if (!node) return;
+
+    if (selectedLayer) {
+      selectedLayer.appendChild(node);
+    }
+
+    node.classList.remove('live-pop');
+    void node.offsetWidth;
+    node.classList.add('live-pop');
+
+    setTimeout(() => {
+      node.classList.remove('live-pop');
+      if (this.selectedRegionId !== regionId && regionsGroup && selectedLayer) {
+        if (node.parentElement === selectedLayer) {
+          regionsGroup.appendChild(node);
+        }
+      }
+    }, 2400);
   }
 }
 
