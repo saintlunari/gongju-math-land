@@ -26,6 +26,11 @@ function initTeacherMap() {
       handleTeacherRegionClick(regionId, data);
     }
   });
+
+  // 초기 렌더링 직후 컨테이너 크기에 맞춰 공주시 150곳 최적 크기로 꽉 채움
+  setTimeout(() => {
+    teacherMap?.fitToContainer();
+  }, 60);
 }
 
 // 교사용 영토 팝아웃 및 상세 카드 인터랙션 핸들러
@@ -437,6 +442,29 @@ function initControls() {
       teacherMap.focusRegion(teacherMap.selectedRegionId, 360);
     }
   });
+
+  // 지도 극대화 (사이드바 숨김/표시 토글) 핸들러
+  const mainEl = document.querySelector('.teacher-main');
+  const toggleWideBtn = document.getElementById('btn-toggle-wide');
+  const zoomWideBtn = document.getElementById('teacher-zoom-wide');
+
+  function handleToggleWide() {
+    if (!mainEl) return;
+    window.soundManager.playClick();
+    const isWide = mainEl.classList.toggle('wide-map-mode');
+    const wideText = document.getElementById('wide-text');
+    const wideIcon = document.getElementById('wide-icon');
+
+    if (wideText) wideText.textContent = isWide ? '대시보드 보기' : '지도 극대화';
+    if (wideIcon) wideIcon.textContent = isWide ? '📊' : '⛶';
+
+    setTimeout(() => {
+      teacherMap?.fitToContainer();
+    }, 80);
+  }
+
+  toggleWideBtn?.addEventListener('click', handleToggleWide);
+  zoomWideBtn?.addEventListener('click', handleToggleWide);
 }
 
 // 주간 시즌 뱃지 및 D-Day 타이머 갱신

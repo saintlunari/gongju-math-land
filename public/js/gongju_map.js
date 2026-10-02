@@ -10,7 +10,8 @@ class GongjuMap {
     this.regionsData = {};
     this.svg = null;
     this.selectedRegionId = null;
-    this.baseView = { x: 100, y: 30, w: 900, h: 900 };
+    this.bounds = { cx: 550, cy: 480, w: 715, h: 885 }; // 공주시 150개 영토 실제 영역 (minX:203.7, maxX:896.3, minY:45, maxY:915)
+    this.baseView = this.calculateFitView();
     this.view = { ...this.baseView };
     this.dragDistance = 0;
     this.layout = [
@@ -1668,10 +1669,54 @@ class GongjuMap {
     this.render();
   }
 
+  // 화면 컨테이너 가로/세로 비율에 맞춰 공주시 150개 영토를 최대로 꽉 채우는 뷰 계산
+  calculateFitView() {
+    let cw = 800, ch = 800;
+    if (this.container) {
+      const rect = this.container.getBoundingClientRect();
+      if (rect.width > 50 && rect.height > 50) {
+        cw = rect.width;
+        ch = rect.height;
+      }
+    }
+
+    const bounds = this.bounds || { cx: 550, cy: 480, w: 715, h: 885 };
+    const containerAspect = cw / ch;
+    const boundsAspect = bounds.w / bounds.h; // 약 0.808
+
+    let viewW, viewH, viewX, viewY;
+
+    if (containerAspect >= boundsAspect) {
+      // 가로가 넓은 모니터/전자칠판: 세로(885)를 꽉 채우고 가로 비율을 컨테이너에 맞춰 확장
+      viewH = bounds.h;
+      viewW = viewH * containerAspect;
+      viewX = bounds.cx - (viewW / 2);
+      viewY = bounds.cy - (viewH / 2);
+    } else {
+      // 세로가 긴 화면 (스마트폰 세로 모드): 가로(715)를 꽉 채우고 세로 비율 확장
+      viewW = bounds.w;
+      viewH = viewW / containerAspect;
+      viewX = bounds.cx - (viewW / 2);
+      viewY = bounds.cy - (viewH / 2);
+    }
+
+    return { x: viewX, y: viewY, w: viewW, h: viewH };
+  }
+
+  // 뷰포트 크기에 맞춰 지도 전체 영역 재보정
+  fitToContainer() {
+    this.baseView = this.calculateFitView();
+    this.view = { ...this.baseView };
+    this.applyView();
+  }
+
   render() {
+    this.baseView = this.calculateFitView();
+    this.view = { ...this.baseView };
+
     this.container.innerHTML = `
       <div class="gongju-map-wrapper">
-        <svg id="${this.container.id}-svg" viewBox="${this.view.x} ${this.view.y} ${this.view.w} ${this.view.h}" class="gongju-svg real-map-svg" xmlns="http://www.w3.org/2000/svg">
+        <svg id="${this.container.id}-svg" viewBox="${this.view.x.toFixed(1)} ${this.view.y.toFixed(1)} ${this.view.w.toFixed(1)} ${this.view.h.toFixed(1)}" class="gongju-svg real-map-svg" xmlns="http://www.w3.org/2000/svg">
           <defs>
             <linearGradient id="river-blue" x1="0%" y1="0%" x2="100%" y2="100%">
               <stop offset="0%" stop-color="#0288D1" stop-opacity="0.85" />
@@ -1893,20 +1938,34 @@ class GongjuMap {
       this.zoomAt(factor, mapCursorX, mapCursorY, false);
       scheduleApplyView();
     }, { passive: false });
+
+    // 컨테이너 리사이징 시(사이드바 토글, 브라우저 창 크기 조절 등) 자동 뷰포트 맞춤
+    if (window.ResizeObserver && this.container) {
+      let resizeTimer = null;
+      this.resizeObserver = new ResizeObserver(() => {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(() => {
+          if (!this.view || !this.baseView) return;
+          // 사용자가 개별 영토로 깊게 줌인한 상태가 아닐 때 뷰포트 비율 자동 보정
+          if (Math.abs(this.view.h - this.baseView.h) < 30) {
+            this.fitToContainer();
+          }
+        }, 60);
+      });
+      this.resizeObserver.observe(this.container);
+    }
   }
 
   applyView() {
     if (!this.svg) return;
-    const minW = 220, maxW = 1400;
-    this.view.w = Math.max(minW, Math.min(maxW, this.view.w));
-    this.view.h = this.view.w;
-    this.svg.setAttribute('viewBox', `${this.view.x} ${this.view.y} ${this.view.w} ${this.view.h}`);
+    this.svg.setAttribute('viewBox', `${this.view.x.toFixed(1)} ${this.view.y.toFixed(1)} ${this.view.w.toFixed(1)} ${this.view.h.toFixed(1)}`);
   }
 
   zoomAt(factor, cx, cy, autoApply = true) {
     const newW = this.view.w * factor;
     const newH = this.view.h * factor;
-    if (newW < 220 || newW > 1400) return;
+    // 세로 기준 최소 160, 최대 2800 (비율 유지)
+    if (newH < 160 || newH > 2800) return;
 
     this.view.x = cx - ((cx - this.view.x) * newW) / this.view.w;
     this.view.y = cy - ((cy - this.view.y) * newH) / this.view.h;
@@ -1920,28 +1979,31 @@ class GongjuMap {
   zoomIn() {
     const cx = this.view.x + this.view.w / 2;
     const cy = this.view.y + this.view.h / 2;
-    this.zoomAt(0.75, cx, cy);
+    this.zoomAt(0.78, cx, cy);
   }
 
   zoomOut() {
     const cx = this.view.x + this.view.w / 2;
     const cy = this.view.y + this.view.h / 2;
-    this.zoomAt(1.33, cx, cy);
+    this.zoomAt(1.28, cx, cy);
   }
 
   resetView() {
-    this.view = { ...this.baseView };
-    this.applyView();
+    this.fitToContainer();
   }
 
   focusRegion(regionId, zoomLevel = 360) {
     const reg = this.layout.find(r => r.id === regionId);
     if (!reg) return;
 
-    this.view.w = zoomLevel;
-    this.view.h = zoomLevel;
-    this.view.x = reg.cx - zoomLevel / 2;
-    this.view.y = reg.cy - zoomLevel / 2;
+    const ar = (this.view.w && this.view.h) ? (this.view.w / this.view.h) : 1;
+    const targetH = zoomLevel;
+    const targetW = zoomLevel * ar;
+
+    this.view.w = targetW;
+    this.view.h = targetH;
+    this.view.x = reg.cx - targetW / 2;
+    this.view.y = reg.cy - targetH / 2;
     this.applyView();
   }
 

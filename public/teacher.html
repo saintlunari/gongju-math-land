@@ -42,12 +42,16 @@
     <section class="map-panel">
       <div class="panel-title">
         <span>🗺️ 공주시 전역 150개 동·면·리 실시간 영토 점령 지도</span>
+        <button id="btn-toggle-wide" class="btn-wide-mode" title="사이드바를 숨기고 지도를 전자칠판 전체 화면으로 극대화합니다">
+          <span id="wide-icon">⛶</span> <span id="wide-text">지도 극대화</span>
+        </button>
       </div>
       <div class="map-viewport-wrapper">
         <div class="map-controls">
           <button id="teacher-zoom-in" class="pad-btn" title="지도 확대">＋</button>
           <button id="teacher-zoom-out" class="pad-btn" title="지도 축소">－</button>
-          <button id="teacher-zoom-reset" class="pad-btn" title="전체 보기">🧭</button>
+          <button id="teacher-zoom-reset" class="pad-btn" title="전체 보기 (150곳 꽉 채우기)">🧭</button>
+          <button id="teacher-zoom-wide" class="pad-btn" title="지도 극대화 토글">⛶</button>
         </div>
         <div id="teacher-map-container"></div>
 
