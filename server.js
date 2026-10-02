@@ -72,11 +72,6 @@ let gameState = {
     questionsPerDefense: 3,
     maxShield: 5
   },
-  timer: {
-    running: false,
-    remainingSeconds: 600, // 10분
-    initialSeconds: 600
-  },
   regions: {},
   players: {}, // socketId -> playerInfo
   teams: TEAMS,
@@ -131,42 +126,6 @@ function checkTerritoryChain(targetRegionId, ownerId) {
 // 퀴즈 문제 출제: 초등 2학년 2학기 7대 개념 검증 문제 은행에서 지역별 무작위 추출
 function generateQuiz(settings, count = 5, regionId = '') {
   return getQuestionsForRegion(settings, count, regionId);
-}
-
-// 타이머 인터벌
-let timerInterval = null;
-function startTimer() {
-  if (timerInterval) clearInterval(timerInterval);
-  gameState.timer.running = true;
-  timerInterval = setInterval(() => {
-    if (gameState.timer.remainingSeconds > 0) {
-      gameState.timer.remainingSeconds--;
-      io.emit('timer_tick', {
-        remainingSeconds: gameState.timer.remainingSeconds
-      });
-    } else {
-      gameState.timer.running = false;
-      gameState.status = 'ended';
-      clearInterval(timerInterval);
-      io.emit('game_ended', {
-        ranking: calculateRanking()
-      });
-    }
-  }, 1000);
-}
-
-function pauseTimer() {
-  gameState.timer.running = false;
-  if (timerInterval) clearInterval(timerInterval);
-  io.emit('timer_paused', { remainingSeconds: gameState.timer.remainingSeconds });
-}
-
-function resetTimer(seconds = 600) {
-  if (timerInterval) clearInterval(timerInterval);
-  gameState.timer.running = false;
-  gameState.timer.remainingSeconds = seconds;
-  gameState.timer.initialSeconds = seconds;
-  io.emit('timer_reset', { remainingSeconds: seconds });
 }
 
 // 랭킹 계산 (개인전: 개인별 / 반 대항전: 학급별 + 개인 기여도)
@@ -508,19 +467,6 @@ io.on('connection', (socket) => {
     const { action, payload } = data;
 
     switch (action) {
-      case 'start_timer':
-        startTimer();
-        io.emit('timer_started', { remainingSeconds: gameState.timer.remainingSeconds });
-        break;
-
-      case 'pause_timer':
-        pauseTimer();
-        break;
-
-      case 'reset_timer':
-        resetTimer(payload?.seconds || 600);
-        break;
-
       case 'change_game_mode':
         gameState.settings.gameMode = payload?.gameMode || 'individual';
         resetRegions();

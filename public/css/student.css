@@ -475,7 +475,9 @@ body {
 
 .region-node {
   cursor: pointer;
-  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .region-node:hover {
@@ -483,7 +485,7 @@ body {
 }
 
 .region-node:active {
-  transform: scale(0.97);
+  transform: scale(1.06);
 }
 
 .region-path {
@@ -545,10 +547,35 @@ body {
   animation: river-flow 25s linear infinite;
 }
 
+.region-node.selected {
+  transform: scale(1.06);
+  animation: region-pop-out 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes region-pop-out {
+  0% {
+    transform: scale(1);
+  }
+  55% {
+    transform: scale(1.10);
+  }
+  100% {
+    transform: scale(1.06);
+  }
+}
+
+.region-node.selected:hover {
+  transform: scale(1.07);
+}
+
+.region-node.selected:active {
+  transform: scale(1.08);
+}
+
 .region-node.selected .region-path {
   stroke: #FF3D00 !important;
-  stroke-width: 5 !important;
-  filter: drop-shadow(0 0 12px #FF3D00);
+  stroke-width: 4.8 !important;
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.35)) drop-shadow(0 0 12px rgba(255, 61, 0, 0.85));
 }
 
 .region-node.under-attack {

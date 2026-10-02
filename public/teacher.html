@@ -20,25 +20,13 @@
       <span class="badge-teacher">교사용 전자칠판 화면</span>
     </div>
 
-    <!-- 타이머 및 컨트롤 -->
-    <div class="header-center-info">
-      <div class="timer-box">
-        ⏱️ <span id="timer-display">10:00</span>
+    <!-- 주간 일요일 초기화 시즌제 정보 (대형 헤더 배너) -->
+    <div class="header-season-box" style="display: flex; align-items: center; gap: 16px; background: rgba(15, 23, 42, 0.7); border: 2px solid #F59E0B; padding: 10px 20px; border-radius: 18px; box-shadow: 0 4px 14px rgba(245, 158, 11, 0.15);">
+      <div style="display: flex; flex-direction: column; align-items: flex-start; gap: 3px;">
+        <span class="season-badge" id="teacher-season-title" style="color: #FCD34D; font-weight: 900; font-size: 1.2rem; letter-spacing: -0.3px;">👑 제 1시즌 (2학년 반 대항전)</span>
+        <span id="teacher-season-dday" style="font-size: 0.9rem; color: #38BDF8; font-weight: 700;">⏳ 매주 일요일 밤 23:59 리셋 (계산 중...)</span>
       </div>
-      <div class="timer-controls">
-        <button id="btn-timer-start" class="btn-ctrl btn-start">▶️ 시작</button>
-        <button id="btn-timer-pause" class="btn-ctrl btn-pause">⏸️ 일시정지</button>
-        <button id="btn-timer-reset" class="btn-ctrl btn-reset">🔄 리셋</button>
-      </div>
-    </div>
-
-    <!-- 주간 일요일 초기화 시즌제 정보 -->
-    <div class="header-season-box" style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
-      <div style="display: flex; gap: 8px; align-items: center;">
-        <span class="season-badge" id="teacher-season-title" style="background: linear-gradient(135deg, #F59E0B, #D97706); color: white; padding: 4px 12px; border-radius: 12px; font-weight: 800; font-size: 0.95rem;">👑 제 1시즌 (2학년 반 대항전)</span>
-        <button id="btn-open-hall-of-fame" class="btn-ctrl" style="background: #475569; font-size: 0.85rem; padding: 4px 10px;">🏆 명예의 전당</button>
-      </div>
-      <span id="teacher-season-dday" style="font-size: 0.8rem; color: #38BDF8; font-weight: 600;">⏳ 매주 일요일 밤 23:59 리셋 (계산 중...)</span>
+      <button id="btn-open-hall-of-fame" class="btn-ctrl" style="background: linear-gradient(135deg, #F59E0B, #D97706); color: white; font-size: 1rem; font-weight: 800; padding: 9px 18px; border-radius: 12px; border: none; cursor: pointer; box-shadow: 0 4px 12px rgba(245, 158, 11, 0.35); transition: transform 0.15s ease;">🏆 명예의 전당</button>
     </div>
   </header>
 
@@ -118,23 +106,13 @@
           </select>
         </div>
 
-        <div class="settings-grid">
-          <div>
-            <label style="font-size: 0.85rem; color: #94A3B8; display: block; margin-bottom: 4px;">구구단 단원 범위</label>
-            <select id="select-dan-range" class="select-control">
-              <option value="all">2단 ~ 9단 전체</option>
-              <option value="2to5">2단 ~ 5단 (기초)</option>
-              <option value="6to9">6단 ~ 9단 (심화)</option>
-            </select>
-          </div>
-          <div>
-            <label style="font-size: 0.85rem; color: #94A3B8; display: block; margin-bottom: 4px;">타이머 기본 시간</label>
-            <select id="select-timer-duration" class="select-control">
-              <option value="10">10분 (추천)</option>
-              <option value="5">5분 (스피드전)</option>
-              <option value="15">15분 (집중전)</option>
-            </select>
-          </div>
+        <div style="margin-bottom: 10px;">
+          <label style="font-size: 0.85rem; color: #94A3B8; display: block; margin-bottom: 4px;">구구단 단원 범위</label>
+          <select id="select-dan-range" class="select-control">
+            <option value="all">2단 ~ 9단 전체</option>
+            <option value="2to5">2단 ~ 5단 (기초)</option>
+            <option value="6to9">6단 ~ 9단 (심화)</option>
+          </select>
         </div>
 
         <div style="margin-top: 10px;">

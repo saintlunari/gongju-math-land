@@ -1955,16 +1955,23 @@ class GongjuMap {
 
   setSelectedRegion(regionId) {
     this.selectedRegionId = regionId;
+    let selectedNode = null;
     this.layout.forEach(item => {
       const node = document.getElementById(`region-node-${item.id}`);
       if (node) {
         if (item.id === regionId) {
           node.classList.add('selected');
+          selectedNode = node;
         } else {
           node.classList.remove('selected');
         }
       }
     });
+
+    // 선택된 영토를 SVG 최상단 레이어로 이동시켜 이웃 영토에 가려짐 없이 깔끔하게 튀어나오도록 함
+    if (selectedNode && selectedNode.parentElement) {
+      selectedNode.parentElement.appendChild(selectedNode);
+    }
   }
 }
 

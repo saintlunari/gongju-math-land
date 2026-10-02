@@ -13,6 +13,7 @@ function initTeacherMap() {
     isTeacher: true,
     onRegionClick: (regionId, data) => {
       console.log('교사 맵 클릭:', regionId, data);
+      teacherMap.setSelectedRegion(regionId);
     }
   });
 }
@@ -44,9 +45,6 @@ function initSocket() {
 
     // 랭킹 렌더링
     renderRanking(data.ranking);
-
-    // 타이머 렌더링
-    updateTimerDisplay(data.gameState.timer.remainingSeconds);
 
     // 주간 시즌 정보 렌더링
     if (data.season) {
@@ -112,26 +110,6 @@ function initSocket() {
   });
 
   socket.on('player_list_updated', (data) => {
-    renderRanking(data.ranking);
-  });
-
-  // 타이머 틱
-  socket.on('timer_tick', (data) => {
-    updateTimerDisplay(data.remainingSeconds);
-  });
-
-  socket.on('timer_paused', (data) => {
-    updateTimerDisplay(data.remainingSeconds);
-  });
-
-  socket.on('timer_reset', (data) => {
-    updateTimerDisplay(data.remainingSeconds);
-  });
-
-  // 게임 종료
-  socket.on('game_ended', (data) => {
-    window.soundManager.playConquer();
-    addBattleLog('🏆 게임 시간이 종료되었습니다! 최종 승자를 확인하세요!');
     renderRanking(data.ranking);
   });
 }
@@ -249,14 +227,6 @@ function renderRanking(ranking) {
   }
 }
 
-// 타이머 표시 포맷팅
-function updateTimerDisplay(totalSeconds) {
-  const mins = Math.floor(totalSeconds / 60);
-  const secs = totalSeconds % 60;
-  const str = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-  document.getElementById('timer-display').textContent = str;
-}
-
 // 실시간 격전 로그 추가
 function addBattleLog(text) {
   const ticker = document.getElementById('battle-ticker');
@@ -276,24 +246,6 @@ function initControls() {
         payload: { gameMode: newMode }
       });
     }
-  });
-
-  // 타이머 컨트롤
-  document.getElementById('btn-timer-start').addEventListener('click', () => {
-    window.soundManager.playClick();
-    socket.emit('teacher_control', { action: 'start_timer' });
-  });
-
-  document.getElementById('btn-timer-pause').addEventListener('click', () => {
-    window.soundManager.playClick();
-    socket.emit('teacher_control', { action: 'pause_timer' });
-  });
-
-  document.getElementById('btn-timer-reset').addEventListener('click', () => {
-    window.soundManager.playClick();
-    const sel = document.getElementById('select-timer-duration');
-    const seconds = parseInt(sel.value, 10) * 60;
-    socket.emit('teacher_control', { action: 'reset_timer', payload: { seconds } });
   });
 
   // 구구단 단원 변경
