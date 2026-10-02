@@ -4,30 +4,104 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>🏰 공주시 곱셈 땅따먹기 대작전</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Jua&family=Noto+Sans+KR:wght@400;600;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/student.css">
   <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
+
+  <!-- 축하 폭죽 캔버스 -->
+  <canvas id="confetti-canvas" class="confetti-canvas"></canvas>
+
+  <!-- 콤보 알림 팝업 배너 -->
+  <div id="combo-popup" class="combo-popup" style="display: none;">
+    <span class="combo-flame">🔥</span>
+    <span class="combo-text" id="combo-text">3연속 콤보!</span>
+    <span class="combo-bonus">+10점 보너스!</span>
+  </div>
 
   <!-- 상단 프로필 및 헤더 바 -->
   <header class="header-bar">
     <div class="game-title">
       🏰 <span>공주시</span> 땅따먹기
     </div>
-    <div class="my-profile-pill">
-      <span class="my-avatar" id="my-avatar-display">🐯</span>
-      <div class="my-info">
-        <div class="my-name">
-          <span id="my-name-display">학생 이름</span>
-          <span class="color-dot" id="my-color-dot" style="background-color: #FF5252;"></span>
-        </div>
-        <div class="my-stats">
-          <span>🚩 내 땅: <b id="my-territory-count">0</b>곳</span>
-          <span>⭐ 점수: <b id="my-score-display">0</b>점</span>
+
+    <!-- 실시간 연속 콤보 & 연계 보너스 뱃지 HUD -->
+    <div style="display: flex; gap: 6px; align-items: center;">
+      <div class="streak-badge-hud" id="hud-streak-badge" style="display: none;">
+        <span class="streak-icon">🔥</span>
+        <span class="streak-val" id="hud-streak-val">2</span> 콤보!
+      </div>
+      <div class="streak-badge-hud chain-badge-hud" id="hud-chain-badge" style="display: none; background: #059669;">
+        <span class="streak-icon">🔗</span>
+        <span>연계 성공!</span>
+      </div>
+    </div>
+
+    <!-- 획득한 백제 문화 명소 뱃지 리본 모음 -->
+    <div class="my-badge-pouch" id="my-badge-pouch" title="내가 모은 백제 문화 명소 뱃지"></div>
+
+    <div class="header-right-group">
+      <!-- 사운드 On/Off 토글 버튼 -->
+      <button class="btn-sound-toggle" id="btn-sound-toggle" title="효과음 켜기/끄기">🔊</button>
+
+      <!-- 내 프로필 알약 -->
+      <div class="my-profile-pill">
+        <span class="my-avatar" id="my-avatar-display">🐯</span>
+        <div class="my-info">
+          <div class="my-name">
+            <span id="my-name-display">학생 이름</span>
+            <span class="color-dot" id="my-color-dot" style="background-color: #FF5252;"></span>
+          </div>
+          <div class="my-stats">
+            <span id="hud-territory-label">🚩 내 땅: <b id="my-territory-count">0</b>곳</span>
+            <span>⭐ 점수: <b id="my-score-display">0</b>점</span>
+          </div>
         </div>
       </div>
     </div>
   </header>
+
+  <!-- 내 탐험/원정 기록 대시보드 (구구땅 Expedition HUD 스타일) -->
+  <section class="stats-board-card">
+    <div class="stats-grid">
+      <div class="stat-cell stat-solved">
+        <span class="stat-emoji">📝</span>
+        <div class="stat-info">
+          <small>푼 문제</small>
+          <b id="stat-solved">0</b>
+        </div>
+      </div>
+      <div class="stat-cell stat-correct">
+        <span class="stat-emoji">🎯</span>
+        <div class="stat-info">
+          <small>정답</small>
+          <b id="stat-correct">0</b>
+        </div>
+      </div>
+      <div class="stat-cell stat-captured">
+        <span class="stat-emoji">🚩</span>
+        <div class="stat-info">
+          <small>점령</small>
+          <b id="stat-captured">0</b>
+        </div>
+      </div>
+      <div class="stat-cell stat-streak">
+        <span class="stat-emoji">🔥</span>
+        <div class="stat-info">
+          <small>최고 콤보</small>
+          <b id="stat-best-streak">0</b>
+        </div>
+      </div>
+      <!-- 다음 땅 추천 버튼 -->
+      <button id="btn-suggest-region" class="btn-suggest-cell" title="지금 공략하기 가장 좋은 땅을 추천해줍니다!">
+        <span class="suggest-icon">🎯</span>
+        <span class="suggest-label">다음 땅 추천</span>
+      </button>
+    </div>
+  </section>
 
   <!-- 실시간 속보 티커 -->
   <div class="news-ticker" id="news-ticker">
@@ -40,7 +114,35 @@
       <div class="map-header">
         <span class="map-guide">🗺️ 가고 싶은 <b>공주시 동·면·리</b>를 콕 눌러보세요! (총 150곳)</span>
       </div>
-      <div id="map-container"></div>
+
+      <!-- 지도 뷰포트 (플로팅 컨트롤, 나침반, 범례 탑재) -->
+      <div class="map-viewport-wrapper">
+        <!-- 줌 & 뷰 컨트롤 바 (구구땅 스타일) -->
+        <div class="map-controls">
+          <button id="map-btn-zoom-in" class="pad-btn" title="지도 확대" aria-label="지도 확대">＋</button>
+          <button id="map-btn-zoom-out" class="pad-btn" title="지도 축소" aria-label="지도 축소">－</button>
+          <button id="map-btn-home" class="pad-btn pad-btn-home" title="내 땅으로 이동" aria-label="내 땅으로 이동">🏠</button>
+          <button id="map-btn-reset" class="pad-btn" title="전체 지도 보기" aria-label="전체 보기">🧭</button>
+        </div>
+
+        <!-- 북쪽 나침반 (Compass) -->
+        <div class="map-compass" aria-hidden="true" title="북쪽 (N)">
+          <svg viewBox="0 0 24 28" width="18" height="22">
+            <path d="M12 2 L19 24 L12 18 L5 24 Z" fill="#EF4444" />
+          </svg>
+          <span>N</span>
+        </div>
+
+        <!-- 지도 범례 (Legend) -->
+        <div class="map-legend" aria-hidden="true">
+          <span><i class="legend-swatch neutral"></i>빈 땅</span>
+          <span><i class="legend-swatch mine"></i>내 땅</span>
+          <span><i class="legend-swatch enemy"></i>친구 땅</span>
+          <span><i class="legend-swatch shield"></i>🛡️방어</span>
+        </div>
+
+        <div id="map-container"></div>
+      </div>
     </div>
   </main>
 
@@ -56,12 +158,35 @@
         <input type="text" id="input-student-name" class="input-text" placeholder="예: 2학년 김민준" maxlength="8" autofocus>
       </div>
 
-      <div class="form-group">
+      <!-- 모둠 대항전일 때 표시되는 모둠 선택 그리드 -->
+      <div class="form-group" id="team-select-group" style="display: none;">
+        <label class="form-label">참가할 모둠 고르기 (4개 모둠 대항전)</label>
+        <div class="team-grid" id="team-grid">
+          <div class="team-item active" data-team="team_1" style="border-color: #2563EB;">
+            <span class="team-avatar">🐉</span>
+            <span class="team-name">1모둠 청룡</span>
+          </div>
+          <div class="team-item" data-team="team_2" style="border-color: #EA580C;">
+            <span class="team-avatar">🐯</span>
+            <span class="team-name">2모둠 백호</span>
+          </div>
+          <div class="team-item" data-team="team_3" style="border-color: #DC2626;">
+            <span class="team-avatar">🦅</span>
+            <span class="team-name">3모둠 주작</span>
+          </div>
+          <div class="team-item" data-team="team_4" style="border-color: #16A34A;">
+            <span class="team-avatar">🐢</span>
+            <span class="team-name">4모둠 현무</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-group" id="individual-avatar-group">
         <label class="form-label">내 캐릭터 고르기</label>
         <div class="avatar-grid" id="avatar-grid"></div>
       </div>
 
-      <div class="form-group">
+      <div class="form-group" id="individual-color-group">
         <label class="form-label">내 땅 색깔 고르기</label>
         <div class="color-grid" id="color-grid"></div>
       </div>
@@ -91,6 +216,21 @@
       <!-- 미션 타입 안내 -->
       <div class="quiz-title" id="quiz-action-type">🚩 새로운 땅 점령 도전!</div>
       <div class="quiz-concept-badge" id="quiz-concept-badge">🦘 몇씩 뛰어 세기</div>
+
+      <!-- 찬스 아이템 바 (3콤보 보상 아이템: 🪄 오답 지우개, 🛡️ 황금 방패) -->
+      <div class="quiz-item-bar" id="quiz-item-bar">
+        <button class="quiz-item-btn" id="btn-use-eraser" title="4지선다 보기 중 틀린 답 2개를 지워줍니다!">
+          <span class="item-emoji">🪄</span>
+          <span class="item-name">오답 지우개</span>
+          <span class="item-badge" id="badge-item-eraser">1</span>
+        </button>
+        <button class="quiz-item-btn" id="btn-use-shield" title="방패를 1개 충전해둡니다!">
+          <span class="item-emoji">🛡️</span>
+          <span class="item-name">황금 방패</span>
+          <span class="item-badge" id="badge-item-shield">0</span>
+        </button>
+      </div>
+
       <div class="quiz-question-text" id="quiz-question-text">문제가 여기에 표시됩니다</div>
 
       <!-- 시각적 도식화 박스 (묶음 그림, 뛰어세기 화살표 등) -->
@@ -133,6 +273,19 @@
         <button class="mode-toggle-btn" id="btn-close-quiz" style="color: #E53935;">포기하기 ✕</button>
       </div>
 
+    </div>
+  </div>
+
+  <!-- =======================================================
+       3. 백제 문화 명소 특별 뱃지 획득 축하 모달
+       ======================================================= -->
+  <div class="modal-overlay" id="badge-modal" style="display: none; z-index: 1200;">
+    <div class="modal-card badge-card" style="text-align: center; max-width: 360px;">
+      <div class="badge-modal-icon" id="badge-modal-icon" style="font-size: 4.8rem; margin: 8px 0;">🏰</div>
+      <div style="font-size: 0.9rem; color: #F59E0B; font-weight: 800; letter-spacing: 0.5px;">🎉 공주시 백제 역사 명소 정복!</div>
+      <h2 class="badge-modal-title" id="badge-modal-name" style="font-size: 1.7rem; margin: 10px 0; color: #1E293B;">공산성 수호자</h2>
+      <p class="badge-modal-desc" id="badge-modal-desc" style="font-size: 0.95rem; color: #64748B; margin-bottom: 22px; line-height: 1.5;">백제 웅진 천도 수도 공산성을 지키는 명예 수호자!</p>
+      <button class="btn-primary" id="btn-close-badge-modal">자랑스럽게 뱃지 받기! 🌟</button>
     </div>
   </div>
 

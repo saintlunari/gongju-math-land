@@ -5,7 +5,30 @@ const socket = io();
 let myProfile = {
   name: '',
   avatar: '🐯',
-  color: '#FF5252'
+  color: '#FF5252',
+  teamId: 'team_1',
+  items: {
+    eraser: 1, // 오답 지우개 기본 1개 제공
+    shield: 0  // 황금 방패
+  },
+  badges: []
+};
+
+let serverGameMode = 'individual'; // 'individual' or 'team'
+let serverTeams = {
+  team_1: { id: 'team_1', name: '1모둠 청룡', avatar: '🐉', color: '#2563EB' },
+  team_2: { id: 'team_2', name: '2모둠 백호', avatar: '🐯', color: '#EA580C' },
+  team_3: { id: 'team_3', name: '3모둠 주작', avatar: '🦅', color: '#DC2626' },
+  team_4: { id: 'team_4', name: '4모둠 현무', avatar: '🐢', color: '#16A34A' }
+};
+
+let myStats = {
+  solved: 0,
+  correct: 0,
+  captured: 0,
+  streak: 0,
+  maxStreak: 0,
+  score: 0
 };
 
 let currentQuizzes = [];
@@ -32,12 +55,34 @@ document.addEventListener('DOMContentLoaded', () => {
   initLobby();
   initMap();
   initKeypad();
+  initMapControls();
+  initStatsAndFeatures();
+  initItemsAndBadges();
 });
 
-// 1. 로비 초기화 (프로필 설정)
+// 1. 로비 초기화 (프로필 및 모둠 설정)
 function initLobby() {
   const avatarGrid = document.getElementById('avatar-grid');
   const colorGrid = document.getElementById('color-grid');
+  const teamGrid = document.getElementById('team-grid');
+
+  // 모둠 선택 그리드 클릭 이벤트
+  if (teamGrid) {
+    teamGrid.addEventListener('click', (e) => {
+      const item = e.target.closest('.team-item');
+      if (!item) return;
+      document.querySelectorAll('.team-item').forEach(el => el.classList.remove('active'));
+      item.classList.add('active');
+      myProfile.teamId = item.dataset.team;
+
+      const team = serverTeams[myProfile.teamId];
+      if (team) {
+        myProfile.avatar = team.avatar;
+        myProfile.color = team.color;
+      }
+      window.soundManager.playClick();
+    });
+  }
 
   // 아바타 렌더링
   avatarGrid.innerHTML = AVATARS.map((av, idx) => `
@@ -73,6 +118,13 @@ function initLobby() {
     const name = nameInput.value.trim() || `학생${Math.floor(Math.random() * 90 + 10)}`;
     myProfile.name = name;
 
+    // 모둠전 모드일 때 모둠 기본 색상/아바타 자동 반영
+    if (serverGameMode === 'team' && serverTeams[myProfile.teamId]) {
+      const t = serverTeams[myProfile.teamId];
+      myProfile.avatar = t.avatar;
+      myProfile.color = t.color;
+    }
+
     window.soundManager.playClick();
 
     // 서버로 입장 전송
@@ -87,8 +139,22 @@ function initLobby() {
 // 내 정보 UI 업데이트
 function updateProfileUI() {
   document.getElementById('my-avatar-display').textContent = myProfile.avatar;
-  document.getElementById('my-name-display').textContent = myProfile.name;
   document.getElementById('my-color-dot').style.backgroundColor = myProfile.color;
+
+  const nameDisplay = document.getElementById('my-name-display');
+  const territoryLabel = document.getElementById('hud-territory-label');
+
+  if (serverGameMode === 'team' && serverTeams[myProfile.teamId]) {
+    const t = serverTeams[myProfile.teamId];
+    nameDisplay.innerHTML = `<span style="color:${t.color}; font-weight:800;">[${t.name}]</span> ${myProfile.name}`;
+    if (territoryLabel) territoryLabel.innerHTML = `🚩 우리 모둠 땅: <b id="my-territory-count">0</b>곳`;
+  } else {
+    nameDisplay.textContent = myProfile.name;
+    if (territoryLabel) territoryLabel.innerHTML = `🚩 내 땅: <b id="my-territory-count">0</b>곳`;
+  }
+
+  updateItemBadges();
+  renderBadgePouch();
 }
 
 // 2. 지도 초기화
@@ -249,6 +315,39 @@ function checkAnswer(chosenVal) {
   const isCorrect = (chosenVal === quiz.answer);
   socket.emit('solve_single_quiz', { isCorrect });
 
+  myStats.solved++;
+  if (isCorrect) {
+    myStats.correct++;
+    myStats.streak++;
+    if (myStats.streak > myStats.maxStreak) {
+      myStats.maxStreak = myStats.streak;
+    }
+    // 콤보 보너스 점수
+    const comboBonus = myStats.streak >= 2 ? (myStats.streak * 5) : 0;
+    myStats.score += 10 + comboBonus;
+
+    if (myStats.streak >= 2) {
+      window.soundManager.playCombo(myStats.streak);
+      showComboPopup(myStats.streak, comboBonus);
+    }
+
+    // 3의 배수 연속 콤보 달성 시 찬스 아이템 획득!
+    if (myStats.streak > 0 && myStats.streak % 3 === 0) {
+      const isEraser = Math.random() < 0.6;
+      if (isEraser) {
+        myProfile.items.eraser++;
+        showTicker(`🎁 ${myStats.streak}연속 콤보 달성! 🪄 [오답 지우개] 찬스를 획득했습니다!`);
+      } else {
+        myProfile.items.shield++;
+        showTicker(`🎁 ${myStats.streak}연속 콤보 달성! 🛡️ [황금 방패] 찬스를 획득했습니다!`);
+      }
+      updateItemBadges();
+    }
+  } else {
+    myStats.streak = 0;
+  }
+  updateStatsUI();
+
   showFeedback(isCorrect, () => {
     if (isCorrect) {
       currentQuizIndex++;
@@ -293,7 +392,11 @@ function showFeedback(isCorrect, callback) {
 
 // 챌린지 성공 완료
 function completeChallengeSuccess() {
+  myStats.captured++;
+  updateStatsUI();
   window.soundManager.playConquer();
+  fireConfetti(); // 축하 폭죽 연출
+
   socket.emit('complete_quiz_challenge', {
     regionId: currentRegionId,
     success: true
@@ -303,8 +406,304 @@ function completeChallengeSuccess() {
   gongjuMap.setSelectedRegion(null);
 }
 
+// 3. 지도 조작 컨트롤 바 초기화
+function initMapControls() {
+  document.getElementById('map-btn-zoom-in')?.addEventListener('click', () => {
+    window.soundManager.playClick();
+    if (gongjuMap) gongjuMap.zoomIn();
+  });
+
+  document.getElementById('map-btn-zoom-out')?.addEventListener('click', () => {
+    window.soundManager.playClick();
+    if (gongjuMap) gongjuMap.zoomOut();
+  });
+
+  document.getElementById('map-btn-home')?.addEventListener('click', () => {
+    window.soundManager.playClick();
+    if (!gongjuMap || !gongjuMap.regionsData) return;
+    const targetOwnerId = (serverGameMode === 'team' && myProfile.teamId) ? myProfile.teamId : socket.id;
+    const myRegions = Object.values(gongjuMap.regionsData).filter(r => r.ownerId === targetOwnerId);
+    if (myRegions.length > 0) {
+      gongjuMap.focusRegion(myRegions[0].id);
+      showTicker(`🏠 ${serverGameMode === 'team' ? '우리 모둠' : '내'} 영토 [${myRegions[0].name}]로 이동했습니다!`);
+    } else {
+      showTicker('🚩 아직 차지한 땅이 없어요! 빈 땅을 눌러 문제를 풀어보세요!');
+    }
+  });
+
+  document.getElementById('map-btn-reset')?.addEventListener('click', () => {
+    window.soundManager.playClick();
+    if (gongjuMap) gongjuMap.resetView();
+  });
+
+  // 사운드 On/Off 토글
+  document.getElementById('btn-sound-toggle')?.addEventListener('click', () => {
+    const isUnmuted = window.soundManager.toggleMute();
+    document.getElementById('btn-sound-toggle').textContent = isUnmuted ? '🔊' : '🔇';
+    showTicker(isUnmuted ? '🔊 효과음이 켜졌습니다.' : '🔇 효과음이 꺼졌습니다.');
+  });
+}
+
+// 4. 탐험 대시보드 및 추천 기능 초기화
+function initStatsAndFeatures() {
+  document.getElementById('btn-suggest-region')?.addEventListener('click', () => {
+    window.soundManager.playClick();
+    suggestNextRegion();
+  });
+}
+
+// 다음 추천 영토 찾기
+function suggestNextRegion() {
+  if (!gongjuMap || !gongjuMap.regionsData) return;
+  const allRegions = Object.values(gongjuMap.regionsData);
+  // 아직 빈 땅(중립) 우선 추천
+  const neutral = allRegions.filter(r => !r.ownerId);
+  const targetPool = neutral.length > 0 ? neutral : allRegions;
+
+  const target = targetPool[Math.floor(Math.random() * targetPool.length)];
+  if (!target) return;
+
+  gongjuMap.focusRegion(target.id, 400);
+  gongjuMap.highlightSuggest(target.id);
+  showTicker(`🎯 [추천 영토] ${target.fullName || target.name}를 공략해보세요!`);
+}
+
+// 연속 콤보 팝업 연출
+function showComboPopup(streak, bonus) {
+  const popup = document.getElementById('combo-popup');
+  const textEl = document.getElementById('combo-text');
+  if (!popup || !textEl) return;
+
+  textEl.textContent = `${streak}연속 콤보!`;
+  popup.style.display = 'flex';
+  popup.classList.add('combo-bounce');
+
+  setTimeout(() => {
+    popup.style.display = 'none';
+    popup.classList.remove('combo-bounce');
+  }, 1400);
+}
+
+// 탐험 기록 UI 갱신
+function updateStatsUI() {
+  const solvedEl = document.getElementById('stat-solved');
+  const correctEl = document.getElementById('stat-correct');
+  const capturedEl = document.getElementById('stat-captured');
+  const streakEl = document.getElementById('stat-best-streak');
+
+  if (solvedEl) solvedEl.textContent = myStats.solved;
+  if (correctEl) correctEl.textContent = myStats.correct;
+  if (capturedEl) capturedEl.textContent = myStats.captured;
+  if (streakEl) streakEl.textContent = myStats.maxStreak;
+
+  // 헤더 streak 뱃지
+  const streakBadge = document.getElementById('hud-streak-badge');
+  const streakVal = document.getElementById('hud-streak-val');
+  if (streakBadge && streakVal) {
+    if (myStats.streak >= 2) {
+      streakVal.textContent = myStats.streak;
+      streakBadge.style.display = 'inline-flex';
+    } else {
+      streakBadge.style.display = 'none';
+    }
+  }
+}
+
+// 축하 폭죽(Confetti) 연출
+function fireConfetti() {
+  const canvas = document.getElementById('confetti-canvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  canvas.style.display = 'block';
+
+  const particles = [];
+  const colors = ['#FF5252', '#FFD54F', '#4CAF50', '#2196F3', '#AB47BC', '#FF4081', '#00E676'];
+
+  for (let i = 0; i < 90; i++) {
+    particles.push({
+      x: canvas.width * 0.5 + (Math.random() - 0.5) * 180,
+      y: canvas.height * 0.45,
+      vx: (Math.random() - 0.5) * 16,
+      vy: (Math.random() - 0.75) * 18,
+      size: Math.random() * 8 + 6,
+      color: colors[Math.floor(Math.random() * colors.length)],
+      rotation: Math.random() * 360,
+      vRot: (Math.random() - 0.5) * 12,
+      alpha: 1
+    });
+  }
+
+  let frame = 0;
+  function animate() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    let alive = false;
+
+    particles.forEach(p => {
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vy += 0.38; // 중력
+      p.rotation += p.vRot;
+      p.alpha -= 0.012;
+
+      if (p.alpha > 0) {
+        alive = true;
+        ctx.save();
+        ctx.globalAlpha = p.alpha;
+        ctx.translate(p.x, p.y);
+        ctx.rotate((p.rotation * Math.PI) / 180);
+        ctx.fillStyle = p.color;
+        ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size);
+        ctx.restore();
+      }
+    });
+
+    frame++;
+    if (alive && frame < 120) {
+      requestAnimationFrame(animate);
+    } else {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      canvas.style.display = 'none';
+    }
+  }
+  requestAnimationFrame(animate);
+}
+
+// 5. 아이템 및 백제 명소 뱃지 기능 초기화
+function initItemsAndBadges() {
+  updateItemBadges();
+
+  // 오답 지우개 찬스 버튼
+  document.getElementById('btn-use-eraser')?.addEventListener('click', () => {
+    if (myProfile.items.eraser <= 0) {
+      showTicker('🪄 지우개 찬스가 없습니다! 3연속 콤보를 달성해 획득해보세요!');
+      return;
+    }
+    const currentQuiz = currentQuizzes[currentQuizIndex];
+    if (!currentQuiz || currentInputMode !== 'multiple') {
+      showTicker('🪄 오답 지우개는 4지선다형 모드에서 사용할 수 있습니다!');
+      return;
+    }
+
+    const buttons = Array.from(document.querySelectorAll('.multiple-btn:not(.item-eliminated)'));
+    const wrongButtons = buttons.filter(btn => parseInt(btn.dataset.val, 10) !== currentQuiz.answer);
+
+    if (wrongButtons.length <= 1) {
+      showTicker('🪄 이미 오답이 지워졌거나 정답만 남아있습니다!');
+      return;
+    }
+
+    // 2개 랜덤 제거
+    const toEliminate = wrongButtons.sort(() => 0.5 - Math.random()).slice(0, 2);
+    toEliminate.forEach(btn => {
+      btn.classList.add('item-eliminated');
+      btn.disabled = true;
+    });
+
+    myProfile.items.eraser--;
+    updateItemBadges();
+    window.soundManager.playCorrect();
+    showTicker('🪄 오답 지우개 찬스 발동! 4지선다 오답 2개가 사라졌습니다!');
+  });
+
+  // 황금 방패 찬스 버튼
+  document.getElementById('btn-use-shield')?.addEventListener('click', () => {
+    if (myProfile.items.shield <= 0) {
+      showTicker('🛡️ 황금 방패 찬스가 없습니다! 3연속 콤보를 달성해 획득해보세요!');
+      return;
+    }
+    myProfile.items.shield--;
+    updateItemBadges();
+    window.soundManager.playShield();
+    showTicker('🛡️ 황금 방패 사용! 이번 영토 정복 시 방어막이 더욱 튼튼해집니다!');
+  });
+
+  // 뱃지 모달 닫기 버튼
+  document.getElementById('btn-close-badge-modal')?.addEventListener('click', () => {
+    document.getElementById('badge-modal').style.display = 'none';
+    window.soundManager.playClick();
+  });
+}
+
+function updateItemBadges() {
+  const eraserBadge = document.getElementById('badge-item-eraser');
+  const shieldBadge = document.getElementById('badge-item-shield');
+  if (eraserBadge) eraserBadge.textContent = myProfile.items.eraser;
+  if (shieldBadge) shieldBadge.textContent = myProfile.items.shield;
+}
+
+// 명소 뱃지 획득 축하 팝업 모달
+function showBadgeUnlockModal(badge) {
+  if (!badge) return;
+  const modal = document.getElementById('badge-modal');
+  const icon = document.getElementById('badge-modal-icon');
+  const name = document.getElementById('badge-modal-name');
+  const desc = document.getElementById('badge-modal-desc');
+
+  if (icon) icon.textContent = badge.icon;
+  if (name) name.textContent = badge.name;
+  if (desc) desc.textContent = `${badge.desc} (${badge.region})`;
+
+  if (modal) {
+    modal.style.display = 'flex';
+    window.soundManager.playConquer();
+    fireConfetti();
+  }
+}
+
+// 획득한 뱃지 파우치 헤더에 렌더링
+function renderBadgePouch() {
+  const pouch = document.getElementById('my-badge-pouch');
+  if (!pouch) return;
+  if (!myProfile.badges || myProfile.badges.length === 0) {
+    pouch.innerHTML = '';
+    return;
+  }
+  pouch.innerHTML = myProfile.badges.map(b => `
+    <span class="badge-ribbon-item" title="${b.name}: ${b.desc} (${b.region})">
+      <span class="badge-ribbon-icon">${b.icon}</span>
+      <span class="badge-ribbon-name">${b.name}</span>
+    </span>
+  `).join('');
+}
+
+// 영토 연계 보너스 축하 HUD 연출
+function showChainBonusPopup() {
+  const chainBadge = document.getElementById('hud-chain-badge');
+  if (chainBadge) {
+    chainBadge.style.display = 'inline-flex';
+    chainBadge.classList.add('combo-bounce');
+    setTimeout(() => {
+      chainBadge.classList.remove('combo-bounce');
+    }, 1500);
+  }
+  showTicker('🔗 영토 연계 성공! 내 세력과 이어져 +20점 보너스를 받았습니다!');
+}
+
+// 게임 모드에 따른 로비 및 HUD 조정
+function adaptGameModeUI(mode) {
+  const teamGroup = document.getElementById('team-select-group');
+  const avatarGroup = document.getElementById('individual-avatar-group');
+  const colorGroup = document.getElementById('individual-color-group');
+
+  if (mode === 'team') {
+    if (teamGroup) teamGroup.style.display = 'block';
+    if (avatarGroup) avatarGroup.style.display = 'none';
+    if (colorGroup) colorGroup.style.display = 'none';
+  } else {
+    if (teamGroup) teamGroup.style.display = 'none';
+    if (avatarGroup) avatarGroup.style.display = 'block';
+    if (colorGroup) colorGroup.style.display = 'block';
+  }
+  updateProfileUI();
+}
+
 // 소켓 실시간 이벤트 수신
 socket.on('joined_success', (data) => {
+  serverGameMode = data.gameState.settings.gameMode || 'individual';
+  if (data.teams) serverTeams = data.teams;
+  adaptGameModeUI(serverGameMode);
   gongjuMap.updateRegions(data.gameState.regions);
 });
 
@@ -318,6 +717,26 @@ socket.on('region_updated', (data) => {
   showTicker(data.text);
 });
 
+socket.on('game_mode_changed', (data) => {
+  serverGameMode = data.gameMode;
+  gongjuMap.updateRegions(data.regions);
+  adaptGameModeUI(data.gameMode);
+  showTicker(`📢 게임 모드가 [${data.gameMode === 'team' ? '4개 모둠 대항전' : '개인전'}]으로 전환되었습니다!`);
+});
+
+socket.on('challenge_result', (data) => {
+  if (data.isChained) {
+    showChainBonusPopup();
+  }
+  if (data.badge) {
+    showBadgeUnlockModal(data.badge);
+  }
+  if (data.badges) {
+    myProfile.badges = data.badges;
+    renderBadgePouch();
+  }
+});
+
 socket.on('regions_reset', (data) => {
   gongjuMap.updateRegions(data.regions);
 });
@@ -327,20 +746,30 @@ socket.on('broadcast_notice', (data) => {
 });
 
 socket.on('ranking_updated', (data) => {
-  // 내 순위 및 영토 수 확인
-  const myRank = data.ranking.find(r => r.id === socket.id);
-  if (myRank) {
-    document.getElementById('my-territory-count').textContent = myRank.territories;
-    document.getElementById('my-score-display').textContent = myRank.score;
+  const isTeam = (serverGameMode === 'team');
+  if (isTeam && data.ranking.teams) {
+    const myTeam = data.ranking.teams.find(t => t.id === myProfile.teamId);
+    if (myTeam) {
+      document.getElementById('my-territory-count').textContent = myTeam.territories;
+      document.getElementById('my-score-display').textContent = myTeam.score;
+    }
+  } else {
+    const players = data.ranking.players || data.ranking;
+    const myRank = players.find(r => r.id === socket.id);
+    if (myRank) {
+      document.getElementById('my-territory-count').textContent = myRank.territories;
+      document.getElementById('my-score-display').textContent = myRank.score;
+    }
   }
 });
 
 // 티커 메시지 표시
 function showTicker(msg) {
   const ticker = document.getElementById('news-ticker');
+  if (!ticker) return;
   ticker.textContent = msg;
   ticker.style.backgroundColor = '#FFE082';
   setTimeout(() => {
     ticker.style.backgroundColor = '#FFF3E0';
-  }, 1200);
+  }, 1800);
 }

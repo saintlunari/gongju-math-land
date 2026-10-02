@@ -92,6 +92,24 @@ class SoundManager {
     osc.start(now);
     osc.stop(now + 0.35);
   }
+
+  // 연속 콤보 사운드 (구구땅 스타일 고에너지 아르페지오)
+  playCombo(comboCount = 2) {
+    if (this.muted) return;
+    const baseFreq = 440; // A4
+    const semitones = [0, 4, 7, 12, 16]; // 메이저 아르페지오
+    const step = Math.min(comboCount - 1, semitones.length - 1);
+    const freq = baseFreq * Math.pow(2, semitones[step] / 12);
+
+    this.playTone(freq, 'triangle', 0.12, 0.0, 0.22);
+    this.playTone(freq * 1.25, 'sine', 0.2, 0.08, 0.25);
+  }
+
+  // 사운드 토글
+  toggleMute() {
+    this.muted = !this.muted;
+    return !this.muted;
+  }
 }
 
 window.soundManager = new SoundManager();

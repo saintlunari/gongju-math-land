@@ -4,6 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>🏰 [교사용 대시보드] 공주시 곱셈 땅따먹기 대작전</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Jua&family=Noto+Sans+KR:wght@400;600;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/student.css">
   <link rel="stylesheet" href="/css/teacher.css">
   <script src="/socket.io/socket.io.js"></script>
@@ -43,7 +46,14 @@
       <div class="panel-title">
         <span>🗺️ 공주시 전역 150개 동·면·리 실시간 영토 점령 지도</span>
       </div>
-      <div id="teacher-map-container"></div>
+      <div class="map-viewport-wrapper">
+        <div class="map-controls">
+          <button id="teacher-zoom-in" class="pad-btn" title="지도 확대">＋</button>
+          <button id="teacher-zoom-out" class="pad-btn" title="지도 축소">－</button>
+          <button id="teacher-zoom-reset" class="pad-btn" title="전체 보기">🧭</button>
+        </div>
+        <div id="teacher-map-container"></div>
+      </div>
     </section>
 
     <!-- 2. 우측 컨트롤 & 랭킹 사이드바 -->
@@ -61,9 +71,25 @@
 
       <!-- 실시간 영토 랭킹 리더보드 -->
       <div class="side-card">
-        <div class="panel-title">
-          <span>🏆 실시간 영토 랭킹</span>
+        <div class="panel-title" style="display: flex; justify-content: space-between; align-items: center;">
+          <span id="ranking-title">🏆 실시간 영토 랭킹</span>
+          <span id="mode-badge" style="font-size: 0.75rem; background: #3B82F6; color: white; padding: 2px 8px; border-radius: 10px;">개인전</span>
         </div>
+
+        <!-- 모둠 대항전 전용 4색 실시간 점유율 바 -->
+        <div id="team-share-container" style="display: none; margin: 12px 0;">
+          <div style="font-size: 0.8rem; color: #94A3B8; margin-bottom: 6px; display: flex; justify-content: space-between;">
+            <span>모둠별 공주시 영토 점유율</span>
+            <span id="conquered-total-ratio">0 / 150곳</span>
+          </div>
+          <div class="team-progress-bar" style="height: 14px; background: #334155; border-radius: 7px; overflow: hidden; display: flex;">
+            <div id="bar-team-1" style="width: 0%; background: #2563EB; transition: width 0.3s;" title="1모둠 청룡"></div>
+            <div id="bar-team-2" style="width: 0%; background: #EA580C; transition: width 0.3s;" title="2모둠 백호"></div>
+            <div id="bar-team-3" style="width: 0%; background: #DC2626; transition: width 0.3s;" title="3모둠 주작"></div>
+            <div id="bar-team-4" style="width: 0%; background: #16A34A; transition: width 0.3s;" title="4모둠 현무"></div>
+          </div>
+        </div>
+
         <div class="ranking-list" id="ranking-list">
           <div style="color: #64748B; text-align: center; padding: 20px;">학생 접속 대기 중...</div>
         </div>
@@ -73,6 +99,14 @@
       <div class="side-card">
         <div class="panel-title">
           <span>⚙️ 교사용 게임 설정</span>
+        </div>
+
+        <div style="margin-bottom: 12px;">
+          <label style="font-size: 0.85rem; color: #94A3B8; display: block; margin-bottom: 4px;">🎮 대전 방식 (모드 전환)</label>
+          <select id="select-game-mode" class="select-control" style="font-weight: bold; background: #1E293B; border-color: #3B82F6;">
+            <option value="individual">👤 개인전 (자유 땅따먹기 경쟁)</option>
+            <option value="team">🐉 4개 모둠 대항전 (청룡·백호·주작·현무)</option>
+          </select>
         </div>
 
         <div class="settings-grid">

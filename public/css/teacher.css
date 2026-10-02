@@ -162,6 +162,27 @@ body {
   justify-content: center;
 }
 
+.map-panel .map-viewport-wrapper {
+  background: #0F172A;
+  border: 1px solid #334155;
+  border-radius: 16px;
+  position: relative;
+  overflow: hidden;
+  flex: 1;
+  display: flex;
+}
+
+.map-panel .pad-btn {
+  background: #1E293B;
+  border-color: #475569;
+  color: #F8FAFC;
+}
+
+.map-panel .pad-btn:hover {
+  background: #334155;
+  border-color: #38BDF8;
+}
+
 /* 교사용 맵 SVG 스타일 커스텀 */
 #teacher-map-container .region-path {
   fill: #1E293B;
@@ -397,4 +418,15 @@ body {
 
 .btn-action-full:hover {
   background: #DC2626;
+}
+
+/* 모둠원 뱃지 태그 */
+.member-tag {
+  display: inline-block;
+  background: #334155;
+  color: #E2E8F0;
+  padding: 2px 7px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  margin: 2px;
 }

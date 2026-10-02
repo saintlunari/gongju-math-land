@@ -10,6 +10,9 @@ class GongjuMap {
     this.regionsData = {};
     this.svg = null;
     this.selectedRegionId = null;
+    this.baseView = { x: 100, y: 30, w: 900, h: 900 };
+    this.view = { ...this.baseView };
+    this.dragDistance = 0;
     this.layout = [
   {
     "id": "ri_1",
@@ -1668,10 +1671,13 @@ class GongjuMap {
   render() {
     this.container.innerHTML = `
       <div class="gongju-map-wrapper">
-        <svg viewBox="100 30 900 900" class="gongju-svg real-map-svg" xmlns="http://www.w3.org/2000/svg">
+        <svg id="${this.container.id}-svg" viewBox="${this.view.x} ${this.view.y} ${this.view.w} ${this.view.h}" class="gongju-svg real-map-svg" xmlns="http://www.w3.org/2000/svg">
           <defs>
             <filter id="soft-shadow" x="-5%" y="-5%" width="110%" height="110%">
               <feDropShadow dx="0" dy="1.5" stdDeviation="2" flood-color="#000" flood-opacity="0.12" />
+            </filter>
+            <filter id="gold-glow" x="-20%" y="-20%" width="140%" height="140%">
+              <feDropShadow dx="0" dy="0" stdDeviation="6" flood-color="#FFD700" flood-opacity="0.9" />
             </filter>
             <linearGradient id="river-blue" x1="0%" y1="0%" x2="100%" y2="100%">
               <stop offset="0%" stop-color="#0288D1" stop-opacity="0.85" />
@@ -1700,7 +1706,9 @@ class GongjuMap {
         </svg>
       </div>
     `;
+    this.svg = document.getElementById(`${this.container.id}-svg`);
     this.attachEvents();
+    this.bindGestures();
   }
 
   createRegionMarkup(item) {
@@ -1749,12 +1757,140 @@ class GongjuMap {
       const node = document.getElementById(`region-node-${item.id}`);
       if (!node) return;
       node.addEventListener('click', () => {
+        if (this.dragDistance > 8) return;
         window.soundManager.playClick();
         if (this.options.onRegionClick) {
           this.options.onRegionClick(item.id, this.regionsData[item.id]);
         }
       });
     });
+  }
+
+  bindGestures() {
+    if (!this.svg) return;
+
+    let isPointerDown = false;
+    let startPoint = { x: 0, y: 0 };
+    let startView = { ...this.view };
+    const activeTouches = new Map();
+
+    const getScale = () => {
+      const rect = this.svg.getBoundingClientRect();
+      return {
+        sx: (this.view.w || 900) / (rect.width || 1),
+        sy: (this.view.h || 900) / (rect.height || 1)
+      };
+    };
+
+    this.svg.addEventListener('pointerdown', (e) => {
+      activeTouches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (activeTouches.size === 1) {
+        isPointerDown = true;
+        this.dragDistance = 0;
+        startPoint = { x: e.clientX, y: e.clientY };
+        startView = { ...this.view };
+        this.svg.style.cursor = 'grabbing';
+      }
+    });
+
+    window.addEventListener('pointermove', (e) => {
+      if (!isPointerDown || !activeTouches.has(e.pointerId)) return;
+      activeTouches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+      if (activeTouches.size === 1) {
+        const dx = e.clientX - startPoint.x;
+        const dy = e.clientY - startPoint.y;
+        this.dragDistance += Math.hypot(dx, dy);
+
+        const { sx, sy } = getScale();
+        this.view.x = startView.x - dx * sx;
+        this.view.y = startView.y - dy * sy;
+        this.applyView();
+      }
+    });
+
+    const pointerEnd = (e) => {
+      activeTouches.delete(e.pointerId);
+      if (activeTouches.size === 0) {
+        isPointerDown = false;
+        if (this.svg) this.svg.style.cursor = 'grab';
+      }
+    };
+
+    window.addEventListener('pointerup', pointerEnd);
+    window.addEventListener('pointercancel', pointerEnd);
+
+    this.svg.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const rect = this.svg.getBoundingClientRect();
+      const cursorX = e.clientX - rect.left;
+      const cursorY = e.clientY - rect.top;
+      const { sx, sy } = getScale();
+
+      const mapCursorX = this.view.x + cursorX * sx;
+      const mapCursorY = this.view.y + cursorY * sy;
+
+      const factor = e.deltaY < 0 ? 0.82 : 1.22;
+      this.zoomAt(factor, mapCursorX, mapCursorY);
+    }, { passive: false });
+  }
+
+  applyView() {
+    if (!this.svg) return;
+    const minW = 220, maxW = 1400;
+    this.view.w = Math.max(minW, Math.min(maxW, this.view.w));
+    this.view.h = this.view.w;
+    this.svg.setAttribute('viewBox', `${this.view.x} ${this.view.y} ${this.view.w} ${this.view.h}`);
+  }
+
+  zoomAt(factor, cx, cy) {
+    const newW = this.view.w * factor;
+    const newH = this.view.h * factor;
+    if (newW < 220 || newW > 1400) return;
+
+    this.view.x = cx - ((cx - this.view.x) * newW) / this.view.w;
+    this.view.y = cy - ((cy - this.view.y) * newH) / this.view.h;
+    this.view.w = newW;
+    this.view.h = newH;
+    this.applyView();
+  }
+
+  zoomIn() {
+    const cx = this.view.x + this.view.w / 2;
+    const cy = this.view.y + this.view.h / 2;
+    this.zoomAt(0.75, cx, cy);
+  }
+
+  zoomOut() {
+    const cx = this.view.x + this.view.w / 2;
+    const cy = this.view.y + this.view.h / 2;
+    this.zoomAt(1.33, cx, cy);
+  }
+
+  resetView() {
+    this.view = { ...this.baseView };
+    this.applyView();
+  }
+
+  focusRegion(regionId, zoomLevel = 360) {
+    const reg = this.layout.find(r => r.id === regionId);
+    if (!reg) return;
+
+    this.view.w = zoomLevel;
+    this.view.h = zoomLevel;
+    this.view.x = reg.cx - zoomLevel / 2;
+    this.view.y = reg.cy - zoomLevel / 2;
+    this.applyView();
+  }
+
+  highlightSuggest(regionId) {
+    const node = document.getElementById(`region-node-${regionId}`);
+    if (!node) return;
+
+    node.classList.add('suggest-pulse');
+    setTimeout(() => {
+      node.classList.remove('suggest-pulse');
+    }, 4000);
   }
 
   updateRegions(regions) {
