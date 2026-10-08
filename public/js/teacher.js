@@ -129,7 +129,10 @@ function initSocket() {
     if (modeSelect) modeSelect.value = mode;
     updateModeBadge(mode);
 
-    // 구구단 단원 및 타이머 설정 반영
+    // 교육과정, 구구단 단원 및 타이머 설정 반영
+    if (document.getElementById('select-curriculum')) {
+      document.getElementById('select-curriculum').value = data.gameState.settings.curriculum || 'all';
+    }
     if (document.getElementById('select-dan-range')) {
       document.getElementById('select-dan-range').value = data.gameState.settings.danRange || 'all';
     }
@@ -299,6 +302,21 @@ function initSocket() {
   socket.on('player_list_updated', (data) => {
     renderRanking(data.ranking);
   });
+
+  // 교사용 게임 설정 업데이트 수신
+  socket.on('settings_updated', (data) => {
+    if (data.settings) {
+      if (document.getElementById('select-curriculum') && data.settings.curriculum) {
+        document.getElementById('select-curriculum').value = data.settings.curriculum;
+      }
+      if (document.getElementById('select-dan-range') && data.settings.danRange) {
+        document.getElementById('select-dan-range').value = data.settings.danRange;
+      }
+      if (document.getElementById('select-concept-mode') && data.settings.conceptMode) {
+        document.getElementById('select-concept-mode').value = data.settings.conceptMode;
+      }
+    }
+  });
 }
 
 // 모드 뱃지 UI 갱신
@@ -435,8 +453,17 @@ function initControls() {
     }
   });
 
+  // 교육과정 (학기) 변경
+  document.getElementById('select-curriculum')?.addEventListener('change', (e) => {
+    window.soundManager.playClick();
+    socket.emit('teacher_control', {
+      action: 'update_settings',
+      payload: { curriculum: e.target.value }
+    });
+  });
+
   // 구구단 단원 변경
-  document.getElementById('select-dan-range').addEventListener('change', (e) => {
+  document.getElementById('select-dan-range')?.addEventListener('change', (e) => {
     window.soundManager.playClick();
     socket.emit('teacher_control', {
       action: 'update_settings',

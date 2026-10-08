@@ -282,7 +282,22 @@ function renderCurrentQuiz() {
   const questionText = document.getElementById('quiz-question-text');
   const visualBox = document.getElementById('quiz-visual-box');
 
-  if (conceptBadge) conceptBadge.textContent = quiz.category || '곱셈구구';
+  if (conceptBadge) {
+    conceptBadge.textContent = quiz.badgeText || (quiz.semesterTitle ? `[${quiz.semesterTitle}] ${quiz.category}` : quiz.category);
+    if (quiz.semester === '2-1') {
+      conceptBadge.style.background = '#EFF6FF';
+      conceptBadge.style.color = '#1D4ED8';
+      conceptBadge.style.borderColor = '#BFDBFE';
+    } else if (quiz.semester === '2-2') {
+      conceptBadge.style.background = '#FEF2F2';
+      conceptBadge.style.color = '#B91C1C';
+      conceptBadge.style.borderColor = '#FECACA';
+    } else {
+      conceptBadge.style.background = '#EDE9FE';
+      conceptBadge.style.color = '#6D28D9';
+      conceptBadge.style.borderColor = '#DDD6FE';
+    }
+  }
   if (questionText) questionText.textContent = quiz.title || '문제를 풀어보세요!';
 
   if (visualBox) {
@@ -1502,7 +1517,22 @@ function renderBossQuiz() {
   const mulGrid = document.getElementById('boss-multiple-options');
   const padContainer = document.getElementById('boss-keypad-container');
 
-  if (conceptBadge) conceptBadge.textContent = quiz.category || '곱셈구구';
+  if (conceptBadge) {
+    conceptBadge.textContent = quiz.badgeText || (quiz.semesterTitle ? `[${quiz.semesterTitle}] ${quiz.category}` : quiz.category);
+    if (quiz.semester === '2-1') {
+      conceptBadge.style.background = '#EFF6FF';
+      conceptBadge.style.color = '#1D4ED8';
+      conceptBadge.style.borderColor = '#BFDBFE';
+    } else if (quiz.semester === '2-2') {
+      conceptBadge.style.background = '#FEF2F2';
+      conceptBadge.style.color = '#B91C1C';
+      conceptBadge.style.borderColor = '#FECACA';
+    } else {
+      conceptBadge.style.background = '#EDE9FE';
+      conceptBadge.style.color = '#6D28D9';
+      conceptBadge.style.borderColor = '#DDD6FE';
+    }
+  }
   if (formulaEl) formulaEl.textContent = quiz.formula || '식을 계산하세요';
   if (visualEl) {
     if (quiz.visual) {

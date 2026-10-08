@@ -72,8 +72,9 @@ let gameState = {
   status: 'playing', // 'ready', 'playing', 'paused', 'ended'
   settings: {
     gameMode: 'team', // 기본 모드를 'team' (2학년 반 대항전)으로 설정!
+    curriculum: 'all', // 'all' (전체), '2-1' (2학년 1학기 복습), '2-2' (2학년 2학기 곱셈구구)
     danRange: 'all', // '2to5', '6to9', 'all'
-    conceptMode: 'all', // 'all', 'visual', 'concept', 'formula'
+    conceptMode: 'all', // 'all', or specific concept types
     inputMode: 'both', // 'keypad', 'multiple', 'both'
     questionsPerConquer: 5,
     questionsPerDefense: 3,
@@ -651,6 +652,15 @@ io.on('connection', (socket) => {
       case 'update_settings':
         gameState.settings = { ...gameState.settings, ...payload };
         io.emit('settings_updated', { settings: gameState.settings });
+        if (payload.curriculum) {
+          const cName = payload.curriculum === '2-1'
+            ? '📘 2학년 1학기 복습 (개념 중심)'
+            : (payload.curriculum === '2-2' ? '📕 2학년 2학기 곱셈구구 (구구단 중심)' : '🌟 2학년 전체 (1학기 복습 + 2학기 곱셈구구)');
+          io.emit('broadcast_notice', {
+            type: 'settings_change',
+            text: `📢 출제 교육과정이 [${cName}]으로 변경되었습니다!`
+          });
+        }
         break;
 
       case 'reset_all_regions':

@@ -179,6 +179,15 @@
           </select>
         </div>
 
+        <div style="margin-bottom: 12px;">
+          <label style="font-size: 0.85rem; color: #94A3B8; display: block; margin-bottom: 4px;">📚 출제 교육과정 (학기 선택)</label>
+          <select id="select-curriculum" class="select-control" style="font-weight: bold; background: #1E293B; border-color: #10B981; color: #34D399;">
+            <option value="all">🌟 2학년 전체 (1학기 복습 + 2학기 곱셈구구)</option>
+            <option value="2-1">📘 2학년 1학기 복습 (곱셈 기초 개념·묶어세기·뛰어세기)</option>
+            <option value="2-2">📕 2학년 2학기 곱셈구구 (구구단 연산·빈칸·문장제)</option>
+          </select>
+        </div>
+
         <div style="margin-bottom: 10px;">
           <label style="font-size: 0.85rem; color: #94A3B8; display: block; margin-bottom: 4px;">구구단 단원 범위</label>
           <select id="select-dan-range" class="select-control">
@@ -189,12 +198,22 @@
         </div>
 
         <div style="margin-top: 10px;">
-          <label style="font-size: 0.85rem; color: #94A3B8; display: block; margin-bottom: 4px;">곱셈 개념 출제 모드</label>
+          <label style="font-size: 0.85rem; color: #94A3B8; display: block; margin-bottom: 4px;">곱셈 개념 및 유형 모드</label>
           <select id="select-concept-mode" class="select-control">
-            <option value="all">🌟 7대 개념 골고루 (뛰어세기·묶어세기·몇배·곱셈식)</option>
-            <option value="visual">🦘 기초 직관형 (뛰어세기 / 묶어세기 / 하나씩세기)</option>
-            <option value="concept">🎁 개념 이해형 (몇씩 몇묶음 / 몇의 몇배)</option>
-            <option value="formula">✏️ 식 변환형 (덧셈식➔곱셈식 / 몇의 몇배➔곱셈식)</option>
+            <option value="all">🌟 전체 유형 골고루 출제</option>
+            <optgroup label="📘 2학년 1학기 복습 (개념 중심)">
+              <option value="visual">🦘 [1학기] 기초 직관형 (뛰어세기 / 묶어세기 / 하나씩세기)</option>
+              <option value="concept">🎁 [1학기] 개념 이해형 (몇씩 몇묶음 / 몇의 몇배)</option>
+              <option value="formula">✏️ [1학기] 식 변환형 (덧셈식➔곱셈식 / 몇의 몇배➔곱셈식)</option>
+            </optgroup>
+            <optgroup label="📕 2학년 2학기 곱셈구구 (구구단 중심)">
+              <option value="gugu_calc">⚡ [2학기] 구구단 기본 연산 (2단~9단 빠른 계산)</option>
+              <option value="gugu_blank">🔍 [2학기] 빈칸 구구단 (□ 채우기·거꾸로 구구단)</option>
+              <option value="gugu_word">🌰 [2학기] 실생활 문장제 (공주 특산물 & 일상 문제)</option>
+              <option value="gugu_rule">📏 [2학기] 구구단 규칙과 성질 (증가량·교환법칙)</option>
+              <option value="zero_one">🎯 [2학기] 0과 1의 곱셈구구</option>
+              <option value="gugu_table">📊 [2학기] 곱셈표와 수 배열 (수 배열표 탐구)</option>
+            </optgroup>
           </select>
         </div>
 
