@@ -858,18 +858,23 @@ body {
 .boss-map-marker {
   cursor: pointer;
   pointer-events: auto;
-  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
-  animation: bossMarkerFloating 3.2s infinite ease-in-out;
 }
 
-.boss-map-marker:hover {
-  transform: scale(1.1);
-  filter: drop-shadow(0 0 16px rgba(236, 72, 153, 0.85));
+/* 자식 컨텐츠 그룹에서만 제자리 플로팅 애니메이션 실행 (부모의 SVG transform="translate(x,y)" 보존!) */
+.boss-marker-content {
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  animation: bossMarkerFloating 3.2s infinite ease-in-out;
+  transform-origin: 0 0;
+}
+
+.boss-map-marker:hover .boss-marker-content {
+  transform: scale(1.12);
+  filter: drop-shadow(0 0 16px rgba(236, 72, 153, 0.9));
 }
 
 @keyframes bossMarkerFloating {
   0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-5px); }
+  50% { transform: translateY(-4px); }
 }
 
 /* 마을과 보스 핀을 잇는 부드러운 네온 골드 점선 (Connector Line) */

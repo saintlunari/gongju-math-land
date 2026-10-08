@@ -1723,6 +1723,11 @@ class GongjuMap {
               <stop offset="50%" stop-color="#29B6F6" stop-opacity="0.9" />
               <stop offset="100%" stop-color="#4FC3F7" stop-opacity="0.85" />
             </linearGradient>
+
+            <!-- 보스 연결선 전용 황금 화살표 머리 -->
+            <marker id="boss-arrow-head" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto">
+              <path d="M 1 2 L 8 5 L 1 8 L 3 5 z" fill="#F59E0B" />
+            </marker>
           </defs>
 
           <!-- 공주시 실제 전역 모든 동·리 폴리곤 레이어 (150개) -->
@@ -2305,11 +2310,17 @@ class GongjuMap {
       targetNode.classList.add('boss-territory-active');
     }
 
-    // 베지어 곡선 연결선 제어점 계산 (마을에서 보스 핀으로 부드럽게 아치형으로 휘어지는 곡선)
-    const midX = (targetX + pinX) / 2;
-    const midY = (targetY + pinY) / 2;
-    const dx = pinX - targetX;
-    const dy = pinY - targetY;
+    // 베지어 곡선 연결선 제어점 및 화살표 도달점 정밀 계산 (마을 앵커 밖에서 출발하여 보스 핀 둘레에 정확히 도달)
+    const angle = Math.atan2(pinY - targetY, pinX - targetX);
+    const startX = targetX + Math.cos(angle) * 9;
+    const startY = targetY + Math.sin(angle) * 9;
+    const endX = pinX - Math.cos(angle) * 23;
+    const endY = pinY - Math.sin(angle) * 23;
+
+    const midX = (startX + endX) / 2;
+    const midY = (startY + endY) / 2;
+    const dx = endX - startX;
+    const dy = endY - startY;
     const ctrlX = midX - dy * 0.16;
     const ctrlY = midY + dx * 0.16;
 
@@ -2332,34 +2343,36 @@ class GongjuMap {
         </g>
       </g>
 
-      <!-- 2. 해당 마을과 보스 핀을 잇는 부드러운 점선 (Leader Line) -->
-      <path class="boss-leader-line-glow" d="M ${targetX},${targetY} Q ${ctrlX},${ctrlY} ${pinX},${pinY}" />
-      <path class="boss-leader-line" d="M ${targetX},${targetY} Q ${ctrlX},${ctrlY} ${pinX},${pinY}" />
+      <!-- 2. 해당 마을에서 보스 핀으로 꽂히는 황금빛 화살표 점선 (Leader Line) -->
+      <path class="boss-leader-line-glow" d="M ${startX.toFixed(1)},${startY.toFixed(1)} Q ${ctrlX.toFixed(1)},${ctrlY.toFixed(1)} ${endX.toFixed(1)},${endY.toFixed(1)}" />
+      <path class="boss-leader-line" d="M ${startX.toFixed(1)},${startY.toFixed(1)} Q ${ctrlX.toFixed(1)},${ctrlY.toFixed(1)} ${endX.toFixed(1)},${endY.toFixed(1)}" marker-end="url(#boss-arrow-head)" />
 
-      <!-- 3. 마을 근처 안전 여백에 위치한 보스 마커 핀 (다른 마을 가림 없음) -->
+      <!-- 3. 마을 근처 안전 여백에 위치한 보스 마커 핀 (다른 마을 가림 일체 없음) -->
       <g class="boss-map-marker" data-boss-id="${bossInfo.bossId || ''}" transform="translate(${pinX}, ${pinY})">
-        <!-- 펄스 파동 오라 2중 링 -->
-        <circle class="boss-pulse-ring ring-1" cx="0" cy="0" r="30" />
-        <circle class="boss-pulse-ring ring-2" cx="0" cy="0" r="42" />
+        <g class="boss-marker-content">
+          <!-- 펄스 파동 오라 2중 링 -->
+          <circle class="boss-pulse-ring ring-1" cx="0" cy="0" r="30" />
+          <circle class="boss-pulse-ring ring-2" cx="0" cy="0" r="42" />
 
-        <!-- 바닥 그림자 -->
-        <ellipse cx="0" cy="18" rx="20" ry="7" fill="rgba(0,0,0,0.4)" filter="blur(2px)" />
+          <!-- 바닥 그림자 -->
+          <ellipse cx="0" cy="18" rx="20" ry="7" fill="rgba(0,0,0,0.4)" filter="blur(2px)" />
 
-        <!-- 보스 아바타 외곽 원 및 아이콘 -->
-        <circle class="boss-avatar-bg" cx="0" cy="0" r="22" />
-        <text class="boss-map-icon" x="0" y="7" text-anchor="middle">${bossInfo.icon || '🐉'}</text>
+          <!-- 보스 아바타 외곽 원 및 아이콘 -->
+          <circle class="boss-avatar-bg" cx="0" cy="0" r="22" />
+          <text class="boss-map-icon" x="0" y="7" text-anchor="middle">${bossInfo.icon || '🐉'}</text>
 
-        <!-- 보스 이름 라벨 뱃지 -->
-        <g class="boss-map-label" transform="translate(0, -30)">
-          <rect class="boss-name-badge-bg" x="-52" y="-10" width="104" height="20" rx="10" />
-          <text class="boss-name-badge-text" x="0" y="2" text-anchor="middle">⚠️ ${displayName}</text>
-        </g>
+          <!-- 보스 이름 라벨 뱃지 -->
+          <g class="boss-map-label" transform="translate(0, -30)">
+            <rect class="boss-name-badge-bg" x="-52" y="-10" width="104" height="20" rx="10" />
+            <text class="boss-name-badge-text" x="0" y="2" text-anchor="middle">⚠️ ${displayName}</text>
+          </g>
 
-        <!-- 실시간 HP 게이지 바 -->
-        <g class="boss-map-hp-bar" transform="translate(0, 28)">
-          <rect class="boss-hp-bar-bg" x="-34" y="-5.5" width="${hpBarW}" height="11" rx="5.5" />
-          <rect class="boss-hp-bar-fill" x="-33" y="-4.5" width="${hpFillW}" height="9" rx="4.5" />
-          <text class="boss-hp-bar-text" x="0" y="2" text-anchor="middle">${bossInfo.currentHp} HP (${hpPercent}%)</text>
+          <!-- 실시간 HP 게이지 바 -->
+          <g class="boss-map-hp-bar" transform="translate(0, 28)">
+            <rect class="boss-hp-bar-bg" x="-34" y="-5.5" width="${hpBarW}" height="11" rx="5.5" />
+            <rect class="boss-hp-bar-fill" x="-33" y="-4.5" width="${hpFillW}" height="9" rx="4.5" />
+            <text class="boss-hp-bar-text" x="0" y="2" text-anchor="middle">${bossInfo.currentHp} HP (${hpPercent}%)</text>
+          </g>
         </g>
       </g>
     `;
