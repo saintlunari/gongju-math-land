@@ -388,6 +388,12 @@ io.on('connection', (socket) => {
     const player = gameState.players[socket.id];
     if (!player) return;
 
+    // 연타/광클로 인한 콤보 및 데미지 중복 누적 방지 (동일 퀴즈 1회만 처리)
+    if (quizId && player.lastBossQuizId === quizId) {
+      return;
+    }
+    player.lastBossQuizId = quizId;
+
     const boss = seasonManager.getBossInfo();
     if (boss.status !== 'raging' || boss.isDefeated) {
       socket.emit('boss_not_active', { boss });
@@ -405,12 +411,13 @@ io.on('connection', (socket) => {
       return;
     }
 
-    // 정답 시 데미지 산출: 기본 10 데미지 + 연속 콤보 크리티컬 보너스 (최대 30)
+    // 정답 시 데미지 산출 (7500~13000 HP 레이드 스케일링):
+    // 기본 25 데미지 + 연속 콤보 크리티컬 보너스 (2연타: 45, 3연타: 55, 4연타: 65, 5연타 이상: 75~80)
     const currentStreak = (streak || 0) + 1;
     const isCrit = (currentStreak >= 2);
-    const damage = isCrit ? Math.min(30, 10 + currentStreak * 5) : 10;
+    const damage = isCrit ? Math.min(80, 25 + currentStreak * 10) : 25;
 
-    player.score += damage;
+    player.score += Math.min(25, damage);
     player.solvedCount += 1;
     gameState.stats.totalSolved += 1;
 

@@ -24,6 +24,11 @@ function initTeacherMap() {
     isTeacher: true,
     onRegionClick: (regionId, data) => {
       handleTeacherRegionClick(regionId, data);
+    },
+    onBossClick: (boss) => {
+      if (boss && boss.regionId) {
+        teacherMap?.focusRegion(boss.regionId, 360);
+      }
     }
   });
 
@@ -539,7 +544,7 @@ function initControls() {
     const bossSelect = document.getElementById('teacher-boss-select');
     const hpSelect = document.getElementById('teacher-boss-hp');
     const bossTemplateId = bossSelect ? bossSelect.value : null;
-    const maxHp = hpSelect ? parseInt(hpSelect.value, 10) : 300;
+    const maxHp = hpSelect ? parseInt(hpSelect.value, 10) : 10000;
 
     const bossName = bossSelect ? bossSelect.options[bossSelect.selectedIndex]?.text : '시즌 보스';
     if (confirm(`🐉 [시즌 보스 토벌전 출격]\n\n${bossName} (HP: ${maxHp})\n\n학급 전체가 실시간으로 협동하여 보스를 물리치는 레이드를 시작하시겠습니까?`)) {
@@ -633,9 +638,15 @@ function renderHallOfFame(hallOfFame) {
   modal.style.display = 'flex';
 }
 
-// [시즌 보스 레이드] 교사 화면 보스 HUD 상태 갱신
+// [시즌 보스 레이드] 교사 화면 보스 HUD 상태 및 지도 위 보스 마커 갱신
 function updateBossHUD(boss) {
   if (!boss) return;
+
+  // 지도 위에 출현 지역 보스 마커 실시간 표시/동기화
+  if (teacherMap) {
+    teacherMap.setBoss(boss);
+  }
+
   const overlay = document.getElementById('teacher-boss-overlay');
   const badgeState = document.getElementById('teacher-boss-state-badge');
   if (!overlay) return;

@@ -48,6 +48,8 @@ let bossStreak = 0;
 let myBossDamageDealt = 0;
 let bossInputMode = 'multiple'; // 'multiple' or 'keypad'
 let bossUserInputValue = '';
+let isBossSubmitting = false; // 보스 퀴즈 연타 중복 제출 방지 플래그
+let isCheckingAnswer = false; // 일반 영토 퀴즈 연타 방지 플래그
 
 // 아바타 목록 16종
 const AVATARS = ['🐯', '🐻', '🐰', '🦊', '🐼', '🐶', '🐱', '🦁', '🦄', '👑', '🤴', '🧙', '🐿️', '🐸', '🦉', '🐨'];
@@ -202,7 +204,10 @@ function updateProfileUI() {
 // 2. 지도 초기화
 function initMap() {
   gongjuMap = new window.GongjuMap('map-container', {
-    onRegionClick: handleRegionClick
+    onRegionClick: handleRegionClick,
+    onBossClick: (boss) => {
+      enterBossRaid();
+    }
   });
 
   // 새로고침 시 이전에 걸려있던 1분 잠금 상태 복원
@@ -369,8 +374,20 @@ function toggleModeButtons() {
 
 // 정답 체크
 function checkAnswer(chosenVal) {
+  if (isCheckingAnswer) return;
+  isCheckingAnswer = true;
+
+  // 정답 연타 방지: 보기 버튼 및 키패드 즉시 비활성화
+  document.querySelectorAll('#quiz-multiple-options .multiple-btn').forEach(btn => {
+    btn.disabled = true;
+    btn.style.pointerEvents = 'none';
+  });
+
   const quiz = currentQuizzes[currentQuizIndex];
-  if (!quiz) return;
+  if (!quiz) {
+    isCheckingAnswer = false;
+    return;
+  }
 
   const isCorrect = (chosenVal === quiz.answer);
   socket.emit('solve_single_quiz', { isCorrect });
@@ -406,6 +423,7 @@ function checkAnswer(chosenVal) {
     updateStatsUI();
 
     showFeedback(true, () => {
+      isCheckingAnswer = false;
       currentQuizIndex++;
       if (currentQuizIndex >= currentQuizzes.length) {
         // 모든 문제 정답! 정복/방어 성공
@@ -424,6 +442,7 @@ function checkAnswer(chosenVal) {
     if (currentChallengeWrongCount >= 3) {
       // 3번 오답 페널티 발동! 1분 동안 잠금
       showFeedback(false, () => {
+        isCheckingAnswer = false;
         handleThreeStrikesLockout(currentRegionId);
       }, '⛔ 3번 오답! 1분간 도전이 제한됩니다!');
       return;
@@ -434,6 +453,11 @@ function checkAnswer(chosenVal) {
       // 오답 시 숫자 초기화하고 다시 도전
       userInputValue = '';
       document.getElementById('quiz-user-input').textContent = '?';
+      document.querySelectorAll('#quiz-multiple-options .multiple-btn').forEach(btn => {
+        btn.disabled = false;
+        btn.style.pointerEvents = 'auto';
+      });
+      isCheckingAnswer = false;
       showTicker(`⚠️ 오답입니다! (남은 기회: ${remainStrikes}번, 3번 틀리면 1분간 잠김)`);
     }, `오답입니다! (남은 기회: ${remainStrikes}번)`);
   }
@@ -869,13 +893,29 @@ socket.on('boss_attack_result', (data) => {
     if (data.nextQuiz) {
       currentBossQuiz = data.nextQuiz;
       setTimeout(renderBossQuiz, 350);
+    } else {
+      isBossSubmitting = false;
     }
   } else {
     bossStreak = 0;
     const streakEl = document.getElementById('boss-my-streak');
     if (streakEl) streakEl.textContent = '0연타';
     window.soundManager.playWrong();
-    showFeedback(false, null, '공격이 빗나갔습니다! 다시 조준해보세요!');
+
+    showFeedback(false, () => {
+      // 오답 피드백 완료 후 보기 버튼 및 키패드 재활성화
+      document.querySelectorAll('#boss-multiple-options .boss-opt-btn').forEach(btn => {
+        btn.disabled = false;
+        btn.style.pointerEvents = 'auto';
+      });
+      const padSubmit = document.querySelector('#boss-keypad-container .key-btn[data-val="submit"]');
+      if (padSubmit) {
+        padSubmit.disabled = false;
+        padSubmit.style.pointerEvents = 'auto';
+      }
+      isBossSubmitting = false;
+    }, '공격이 빗나갔습니다! 다시 조준해보세요!');
+
     bossUserInputValue = '';
     const display = document.getElementById('boss-user-input');
     if (display) display.textContent = '?';
@@ -1380,10 +1420,16 @@ function initBossRaid() {
   });
 }
 
-// 상단 보스 배너 UI 갱신
+// 상단 보스 배너 UI 및 지도 위 보스 마커 갱신
 function updateStudentBossBanner(boss) {
   if (!boss) return;
   currentBossState = boss;
+
+  // 지도 위에 출현 지역 보스 마커 실시간 표시/동기화
+  if (gongjuMap) {
+    gongjuMap.setBoss(boss);
+  }
+
   const banner = document.getElementById('student-boss-banner');
   if (!banner) return;
 
@@ -1445,6 +1491,7 @@ function toggleBossModeButtons() {
 
 // 보스 퀴즈 렌더링
 function renderBossQuiz() {
+  isBossSubmitting = false; // 새 문제 렌더링 시 연타 방지 플래그 해제
   if (!currentBossQuiz) return;
   const quiz = currentBossQuiz;
 
@@ -1491,9 +1538,22 @@ function renderBossQuiz() {
   }
 }
 
-// 보스 공격 답안 전송
+// 보스 공격 답안 전송 (연타 및 콤보 중복 누적 완벽 방지)
 function submitBossAttackAnswer(chosenVal) {
-  if (!currentBossQuiz) return;
+  if (isBossSubmitting || !currentBossQuiz) return;
+  isBossSubmitting = true;
+
+  // 버튼 즉시 비활성화 (정답을 빠르게 여러 번 눌러 콤보가 중복 쌓이는 현상 차단)
+  document.querySelectorAll('#boss-multiple-options .boss-opt-btn').forEach(btn => {
+    btn.disabled = true;
+    btn.style.pointerEvents = 'none';
+  });
+  const padSubmit = document.querySelector('#boss-keypad-container .key-btn[data-val="submit"]');
+  if (padSubmit) {
+    padSubmit.disabled = true;
+    padSubmit.style.pointerEvents = 'none';
+  }
+
   socket.emit('submit_boss_attack', {
     quizId: currentBossQuiz.id,
     answer: currentBossQuiz.answer,

@@ -1745,6 +1745,9 @@ class GongjuMap {
 
           <!-- 선택된 영토 전용 최상위 레이어 (모든 인접 영토 및 하천 위로 100% 팝아웃) -->
           <g class="selected-region-layer" id="${this.container.id}-selected-layer"></g>
+
+          <!-- 시즌 보스 거대 몬스터 출현 전용 최상위 마커 레이어 -->
+          <g class="boss-marker-layer" id="${this.container.id}-boss-layer"></g>
         </svg>
       </div>
     `;
@@ -1824,11 +1827,22 @@ class GongjuMap {
     });
   }
 
-  // 이벤트 위임(Event Delegation)으로 단 1개의 이벤트 리스너로 150개 영토 클릭 처리
+  // 이벤트 위임(Event Delegation)으로 단 1개의 이벤트 리스너로 150개 영토 및 보스 마커 클릭 처리
   attachEvents() {
     if (!this.svg) return;
     this.svg.addEventListener('click', (e) => {
       if (this.dragDistance > 12) return;
+
+      // 시즌 보스 마커 클릭 감지
+      const bossMarker = e.target.closest('.boss-map-marker');
+      if (bossMarker) {
+        window.soundManager?.playClick();
+        if (this.options.onBossClick && this.currentBoss) {
+          this.options.onBossClick(this.currentBoss);
+        }
+        return;
+      }
+
       const node = e.target.closest('.region-node');
       if (!node) return;
       const regionId = node.dataset.id;
@@ -2204,6 +2218,85 @@ class GongjuMap {
     if (text) {
       text.textContent = `🔒 ${remainingSeconds}s`;
     }
+  }
+
+  // 시즌 보스 거대 몬스터 지도 마커 및 침공 영토 표시
+  setBoss(bossInfo) {
+    this.currentBoss = bossInfo;
+    const bossLayer = this.svg ? (this.svg.querySelector('.boss-marker-layer') || document.getElementById(`${this.container.id}-boss-layer`)) : null;
+
+    // 이전 활성화 영토 테두리 펄스 클래스 제거
+    if (this.activeBossRegionId) {
+      const prevEl = this.domCache ? this.domCache[this.activeBossRegionId] : null;
+      const prevNode = prevEl ? prevEl.node : document.getElementById(`region-node-${this.activeBossRegionId}`);
+      if (prevNode) prevNode.classList.remove('boss-territory-active');
+      this.activeBossRegionId = null;
+    }
+
+    if (!bossLayer) return;
+
+    // 보스가 없거나 잠자고 있거나 이미 토벌된 경우 마커 제거
+    if (!bossInfo || bossInfo.status !== 'raging' || bossInfo.isDefeated) {
+      bossLayer.innerHTML = '';
+      return;
+    }
+
+    // 4대 보스 기본 출현 좌표 및 영토 매핑
+    const bossCoords = {
+      boss_dragon: { cx: 580, cy: 475, regionId: 'ri_137', shortName: '금강대룡' },
+      boss_goblin: { cx: 658.9, cy: 203.4, regionId: 'ri_21', shortName: '알밤 도깨비' },
+      boss_golem: { cx: 647.7, cy: 757.2, regionId: 'ri_91', shortName: '바위 골렘' },
+      boss_phoenix: { cx: 627.7, cy: 528.6, regionId: 'ri_127', shortName: '황금 불사조' }
+    };
+
+    const preset = bossCoords[bossInfo.bossId] || { cx: 580, cy: 475, regionId: 'ri_137', shortName: '시즌 보스' };
+    const cx = (typeof bossInfo.cx === 'number') ? bossInfo.cx : preset.cx;
+    const cy = (typeof bossInfo.cy === 'number') ? bossInfo.cy : preset.cy;
+    const regionId = bossInfo.regionId || preset.regionId;
+    const displayName = bossInfo.shortName || preset.shortName || bossInfo.name || '시즌 보스';
+
+    // 해당 영토 하이라이트 클래스 부여
+    this.activeBossRegionId = regionId;
+    const targetEl = this.domCache ? this.domCache[regionId] : null;
+    const targetNode = targetEl ? targetEl.node : document.getElementById(`region-node-${regionId}`);
+    if (targetNode) {
+      targetNode.classList.add('boss-territory-active');
+    }
+
+    const hpPercent = bossInfo.hpPercent !== undefined
+      ? bossInfo.hpPercent
+      : (bossInfo.maxHp > 0 ? Math.round((bossInfo.currentHp / bossInfo.maxHp) * 100) : 0);
+
+    const hpBarW = 76;
+    const hpFillW = Math.max(0, Math.min(hpBarW - 2, (hpBarW - 2) * (hpPercent / 100)));
+
+    bossLayer.innerHTML = `
+      <g class="boss-map-marker" data-boss-id="${bossInfo.bossId || ''}" transform="translate(${cx}, ${cy})">
+        <!-- 펄스 파동 오라 2중 링 -->
+        <circle class="boss-pulse-ring ring-1" cx="0" cy="0" r="38" />
+        <circle class="boss-pulse-ring ring-2" cx="0" cy="0" r="54" />
+
+        <!-- 바닥 그림자 -->
+        <ellipse cx="0" cy="22" rx="26" ry="9" fill="rgba(0,0,0,0.45)" filter="blur(2px)" />
+
+        <!-- 보스 아바타 외곽 원 및 아이콘 -->
+        <circle class="boss-avatar-bg" cx="0" cy="0" r="26" />
+        <text class="boss-map-icon" x="0" y="8" text-anchor="middle">${bossInfo.icon || '🐉'}</text>
+
+        <!-- 보스 이름 라벨 뱃지 -->
+        <g class="boss-map-label" transform="translate(0, -34)">
+          <rect class="boss-name-badge-bg" x="-58" y="-12" width="116" height="22" rx="11" />
+          <text class="boss-name-badge-text" x="0" y="2" text-anchor="middle">⚠️ ${displayName}</text>
+        </g>
+
+        <!-- 실시간 HP 게이지 바 -->
+        <g class="boss-map-hp-bar" transform="translate(0, 34)">
+          <rect class="boss-hp-bar-bg" x="-38" y="-6" width="${hpBarW}" height="12" rx="6" />
+          <rect class="boss-hp-bar-fill" x="-37" y="-5" width="${hpFillW}" height="10" rx="5" />
+          <text class="boss-hp-bar-text" x="0" y="2.5" text-anchor="middle">${bossInfo.currentHp} HP (${hpPercent}%)</text>
+        </g>
+      </g>
+    `;
   }
 }
 

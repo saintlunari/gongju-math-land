@@ -73,41 +73,44 @@
     "badgeId": "badge_boss_dragon",
     "badgeName": "금강룡 토벌 영웅",
     "badgeDesc": "금강을 지키는 거대 수호용과의 곱셈 대결에서 승리한 영웅!",
-    "maxHp": 20,
-    "currentHp": 0,
-    "isDefeated": true,
-    "status": "defeated",
+    "maxHp": 7500,
+    "currentHp": 7475,
+    "regionId": "ri_137",
+    "cx": 580,
+    "cy": 475,
+    "isDefeated": false,
+    "status": "sleeping",
     "location": "공주시 금강 본류 (신관동·금성동 사이)",
     "story": "공주시 한가운데를 흐르는 금강에서 깨어난 거대 수호용 금강대룡! 2학년 친구들의 단합된 구구단 주문으로 용을 감동시켜 공주시를 수호하게 만들어야 합니다!",
     "rewardScore": 100,
-    "summonedAt": "2026-10-07T03:41:35.219Z",
-    "defeatedAt": "2026-10-07T03:41:35.223Z",
-    "totalDamageDealt": 20,
+    "summonedAt": "2026-10-08T03:18:33.394Z",
+    "defeatedAt": null,
+    "totalDamageDealt": 25,
     "contributors": {
-      "Aohj75jeWgvNGHb-AAAB": {
-        "id": "Aohj75jeWgvNGHb-AAAB",
-        "name": "이순신",
-        "avatar": "🦁",
+      "7NJ_0V-88iG3_fbxAAAA": {
+        "id": "7NJ_0V-88iG3_fbxAAAA",
+        "name": "테스트학생",
+        "avatar": "🐯",
         "color": "#2563EB",
         "teamId": "team_1",
-        "damage": 20,
+        "damage": 25,
         "hits": 1
       }
     },
     "teamDamage": {
-      "team_1": 20,
+      "team_1": 25,
       "team_2": 0,
       "team_3": 0,
       "team_4": 0
     },
     "lastHitLog": [
       {
-        "studentName": "이순신",
-        "avatar": "🦁",
+        "studentName": "테스트학생",
+        "avatar": "🐯",
         "teamId": "team_1",
-        "damage": 20,
-        "isCrit": true,
-        "time": 1791344495223
+        "damage": 25,
+        "isCrit": false,
+        "time": 1791429513399
       }
     ]
   }

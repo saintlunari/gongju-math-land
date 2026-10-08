@@ -853,3 +853,113 @@ body {
   color: #38BDF8;
   font-weight: 800;
 }
+
+/* 지도 위 거대 보스 마커 및 관련 영토 실시간 연출 스타일 */
+.boss-map-marker {
+  cursor: pointer;
+  pointer-events: auto;
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  animation: bossMarkerFloating 3.2s infinite ease-in-out;
+}
+
+.boss-map-marker:hover {
+  transform: scale(1.12);
+  filter: drop-shadow(0 0 16px rgba(236, 72, 153, 0.85));
+}
+
+@keyframes bossMarkerFloating {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+.boss-pulse-ring {
+  fill: none;
+  stroke: #EC4899;
+  stroke-width: 2.5px;
+  stroke-dasharray: 4 2;
+  animation: bossRingExpand 2.2s infinite ease-out;
+  transform-origin: 0 0;
+}
+
+.boss-pulse-ring.ring-2 {
+  stroke: #F59E0B;
+  animation-delay: 1.1s;
+}
+
+@keyframes bossRingExpand {
+  0% {
+    r: 26;
+    opacity: 0.9;
+    stroke-width: 3.5px;
+  }
+  100% {
+    r: 68;
+    opacity: 0;
+    stroke-width: 1px;
+  }
+}
+
+.boss-avatar-bg {
+  fill: #3B0764;
+  stroke: #F472B6;
+  stroke-width: 3.5px;
+  filter: drop-shadow(0 0 12px rgba(236, 72, 153, 0.7));
+}
+
+.boss-map-icon {
+  font-size: 26px;
+  user-select: none;
+  pointer-events: none;
+}
+
+.boss-name-badge-bg {
+  fill: #0F172A;
+  stroke: #F59E0B;
+  stroke-width: 2px;
+  filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.5));
+}
+
+.boss-name-badge-text {
+  fill: #FDE047;
+  font-size: 10.5px;
+  font-weight: 900;
+  letter-spacing: -0.2px;
+}
+
+.boss-hp-bar-bg {
+  fill: #1E293B;
+  stroke: #475569;
+  stroke-width: 1.5px;
+}
+
+.boss-hp-bar-fill {
+  fill: #EF4444;
+  transition: width 0.3s ease;
+}
+
+.boss-hp-bar-text {
+  fill: #FFFFFF;
+  font-size: 7.5px;
+  font-weight: 800;
+}
+
+.boss-territory-active .region-path {
+  stroke: #EC4899 !important;
+  stroke-width: 4px !important;
+  stroke-dasharray: 6 3;
+  animation: bossTerritoryStrokePulse 1.5s infinite ease-in-out !important;
+}
+
+@keyframes bossTerritoryStrokePulse {
+  0%, 100% {
+    stroke: #EC4899;
+    stroke-width: 3.5px;
+    filter: drop-shadow(0 0 6px rgba(236, 72, 153, 0.6));
+  }
+  50% {
+    stroke: #F59E0B;
+    stroke-width: 5.5px;
+    filter: drop-shadow(0 0 14px rgba(245, 158, 11, 0.9));
+  }
+}
+
