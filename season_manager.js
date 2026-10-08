@@ -116,6 +116,12 @@ function getWeekKey(date = new Date()) {
 
 class SeasonManager {
   constructor() {
+    this.corruptionSettings = {
+      enabled: true,
+      intervalSec: 300, // 기본 5분마다 1곳씩 (300초)
+      maxCount: 8       // 기본 최대 8곳 안전 제한
+    };
+    this.nextCorruptionCountdown = 300;
     this.data = this.loadSeasonData();
     this.checkAndInitSeason();
     this.ensureBossInitialized();
@@ -189,7 +195,8 @@ class SeasonManager {
       totalDamageDealt: 0,
       contributors: {},
       teamDamage: { team_1: 0, team_2: 0, team_3: 0, team_4: 0 },
-      lastHitLog: []
+      lastHitLog: [],
+      corruptedTerritories: []
     };
   }
 
@@ -198,6 +205,8 @@ class SeasonManager {
     if (!this.data.currentBoss || !this.data.currentBoss.bossId) {
       this.data.currentBoss = this.initBossForSeason(this.data.currentSeason);
       this.saveSeasonData();
+    } else if (!this.data.currentBoss.corruptedTerritories) {
+      this.data.currentBoss.corruptedTerritories = [];
     }
   }
 
@@ -277,7 +286,11 @@ class SeasonManager {
       teamDamage: b.teamDamage || { team_1: 0, team_2: 0, team_3: 0, team_4: 0 },
       lastHitLog: b.lastHitLog || [],
       topContributors: sortedContributors.slice(0, 5),
-      mvp: sortedContributors[0] || null
+      mvp: sortedContributors[0] || null,
+      corruptedTerritories: b.corruptedTerritories || [],
+      corruptedCount: (b.corruptedTerritories || []).length,
+      corruptionSettings: { ...this.corruptionSettings },
+      nextCorruptionCountdown: this.nextCorruptionCountdown
     };
   }
 
@@ -321,11 +334,13 @@ class SeasonManager {
       totalDamageDealt: 0,
       contributors: {},
       teamDamage: { team_1: 0, team_2: 0, team_3: 0, team_4: 0 },
-      lastHitLog: []
+      lastHitLog: [],
+      corruptedTerritories: []
     };
 
+    this.nextCorruptionCountdown = this.corruptionSettings.intervalSec;
     this.saveSeasonData();
-    console.log(`🐉 [시즌 보스 소환] ${tmpl.name} (HP: ${hp}) 출격 완료!`);
+    console.log(`🐉 [시즌 보스 소환] ${tmpl.name} (HP: ${hp}) 출격 완료! (침식 주기: ${this.corruptionSettings.intervalSec}초)`);
     return this.getBossInfo();
   }
 
@@ -336,6 +351,267 @@ class SeasonManager {
     this.saveSeasonData();
     console.log(`⚔️ [시즌 보스 퇴각] 보스 토벌전이 교사 권한으로 종료되었습니다.`);
     return this.getBossInfo();
+  }
+
+  // 침식 설정 변경 (교사 제어)
+  setCorruptionSettings(newSettings = {}) {
+    if (typeof newSettings.enabled === 'boolean') {
+      this.corruptionSettings.enabled = newSettings.enabled;
+    }
+    if (typeof newSettings.intervalSec === 'number' && newSettings.intervalSec >= 10) {
+      this.corruptionSettings.intervalSec = newSettings.intervalSec;
+      if (this.nextCorruptionCountdown > newSettings.intervalSec) {
+        this.nextCorruptionCountdown = newSettings.intervalSec;
+      }
+    }
+    if (typeof newSettings.maxCount === 'number' && newSettings.maxCount >= 1) {
+      this.corruptionSettings.maxCount = newSettings.maxCount;
+    }
+    return {
+      ...this.corruptionSettings,
+      nextCorruptionCountdown: this.nextCorruptionCountdown
+    };
+  }
+
+  getCorruptionSettings() {
+    return { ...this.corruptionSettings };
+  }
+
+  getCorruptionCountdown() {
+    return this.nextCorruptionCountdown;
+  }
+
+  getCorruptedCount() {
+    this.ensureBossInitialized();
+    return (this.data.currentBoss?.corruptedTerritories || []).length;
+  }
+
+  getMaxCorrupted() {
+    return this.corruptionSettings.maxCount;
+  }
+
+  // 매 1초마다 호출되는 침식 타이머 틱
+  tickCorruption(gameState) {
+    this.ensureBossInitialized();
+    const b = this.data.currentBoss;
+    if (!b || b.status !== 'raging' || b.isDefeated) {
+      return null;
+    }
+    if (!this.corruptionSettings.enabled) {
+      return null;
+    }
+
+    this.nextCorruptionCountdown -= 1;
+    if (this.nextCorruptionCountdown <= 0) {
+      this.nextCorruptionCountdown = this.corruptionSettings.intervalSec;
+      return this.corruptNextTerritory(gameState);
+    }
+    return null;
+  }
+
+  // 다음 인접 영토 잠식 실행 (BFS 인접 탐색 & 방어막 상호작용)
+  corruptNextTerritory(gameState) {
+    this.ensureBossInitialized();
+    const b = this.data.currentBoss;
+    if (!b || b.status !== 'raging' || b.isDefeated) {
+      return null;
+    }
+    if (!gameState || !gameState.regions) {
+      return null;
+    }
+
+    if (!b.corruptedTerritories) b.corruptedTerritories = [];
+
+    // 최대 잠식 한도 체크
+    if (b.corruptedTerritories.length >= this.corruptionSettings.maxCount) {
+      return {
+        action: 'max_limit_reached',
+        totalCorrupted: b.corruptedTerritories.length,
+        maxCount: this.corruptionSettings.maxCount,
+        boss: this.getBossInfo()
+      };
+    }
+
+    const allRegions = Object.values(gameState.regions);
+    const corruptedIds = new Set(b.corruptedTerritories.map(t => t.regionId));
+
+    let candidate = null;
+
+    // 1순위: 보스 출현 거점 영토 자체 (아직 잠식되지 않았다면 최우선 대상)
+    const originId = b.regionId || 'ri_134';
+    const originRegion = gameState.regions[originId];
+    if (originRegion && !originRegion.isCorrupted && !corruptedIds.has(originId)) {
+      candidate = originRegion;
+    } else {
+      // 2순위: 이미 잠식된 영토들(또는 거점 영토)과 국경이 맞닿아 있는 인접 영토 탐색
+      const sourceRegions = [];
+      if (originRegion) sourceRegions.push(originRegion);
+      corruptedIds.forEach(id => {
+        if (gameState.regions[id] && !sourceRegions.some(sr => sr.id === id)) {
+          sourceRegions.push(gameState.regions[id]);
+        }
+      });
+
+      // sourceRegions의 인접 영토 중 아직 잠식되지 않은 후보군 수집
+      const adjacentCandidates = [];
+      allRegions.forEach(reg => {
+        if (reg.isCorrupted || corruptedIds.has(reg.id) || reg.ownerId === 'boss') return;
+        if (typeof reg.cx !== 'number' || typeof reg.cy !== 'number') return;
+
+        // sourceRegions 중 적어도 하나와 인접한지 확인 (거리 85 이하 또는 같은 읍면동)
+        const isAdj = sourceRegions.some(src => {
+          if (typeof src.cx !== 'number' || typeof src.cy !== 'number') return false;
+          const dist = Math.hypot(reg.cx - src.cx, reg.cy - src.cy);
+          return dist <= 85 || (reg.town && src.town && reg.town === src.town);
+        });
+
+        if (isAdj) {
+          adjacentCandidates.push(reg);
+        }
+      });
+
+      if (adjacentCandidates.length > 0) {
+        // 우선순위 정렬:
+        // 1) 방어막이 낮거나 없는 곳 (shield: 0 또는 1)
+        // 2) 보스 거점(targetX, targetY)과 물리적 거리가 가까운 곳
+        const bossX = (typeof b.targetX === 'number') ? b.targetX : 600;
+        const bossY = (typeof b.targetY === 'number') ? b.targetY : 500;
+
+        adjacentCandidates.sort((a, bReg) => {
+          const aShield = a.shield || 0;
+          const bShield = bReg.shield || 0;
+          if (aShield !== bShield) {
+            return aShield - bShield;
+          }
+          const distA = Math.hypot(a.cx - bossX, a.cy - bossY);
+          const distB = Math.hypot(bReg.cx - bossX, bReg.cy - bossY);
+          return distA - distB;
+        });
+
+        candidate = adjacentCandidates[0];
+      } else {
+        // 인접 후보가 없을 시: 남은 영토 중 보스와 가장 가까운 곳
+        const uncorrupted = allRegions.filter(r => !r.isCorrupted && !corruptedIds.has(r.id) && r.ownerId !== 'boss');
+        if (uncorrupted.length > 0) {
+          const bossX = (typeof b.targetX === 'number') ? b.targetX : 600;
+          const bossY = (typeof b.targetY === 'number') ? b.targetY : 500;
+          uncorrupted.sort((a, bReg) => {
+            const distA = Math.hypot(a.cx - bossX, a.cy - bossY);
+            const distB = Math.hypot(bReg.cx - bossX, bReg.cy - bossY);
+            return distA - distB;
+          });
+          candidate = uncorrupted[0];
+        }
+      }
+    }
+
+    if (!candidate) {
+      return null;
+    }
+
+    // 방어막 상호작용 검사:
+    // 방어막이 2단계 이상이면, 방어막 1단계를 소모하여 침식을 막아냄!
+    if (candidate.shield > 1) {
+      candidate.shield -= 1;
+      return {
+        action: 'defended_by_shield',
+        region: candidate,
+        regionId: candidate.id,
+        regionName: candidate.name,
+        town: candidate.town,
+        shieldRemaining: candidate.shield,
+        boss: this.getBossInfo()
+      };
+    }
+
+    // 침식 진행 (방어막 1단계 이하 또는 빈 땅)
+    const prevData = {
+      ownerId: candidate.ownerId || null,
+      ownerName: candidate.ownerName || null,
+      ownerColor: candidate.ownerColor || null,
+      ownerAvatar: candidate.ownerAvatar || null,
+      capturedBy: candidate.capturedBy || null,
+      capturedById: candidate.capturedById || null,
+      shield: candidate.shield || 0
+    };
+
+    candidate.isCorrupted = true;
+    candidate.corruptedByBoss = b.bossId;
+    candidate.corruptedTheme = b.bossId;
+    candidate.ownerId = 'boss';
+    candidate.ownerName = b.shortName;
+    candidate.ownerColor = '#4C1D95';
+    candidate.ownerAvatar = b.icon;
+    candidate.shield = 0;
+
+    b.corruptedTerritories.push({
+      regionId: candidate.id,
+      regionName: candidate.name,
+      town: candidate.town,
+      prevData,
+      corruptedAt: new Date().toISOString()
+    });
+
+    this.saveSeasonData();
+    console.log(`⚠️ [영토 잠식] 보스 [${b.name}]이(가) [${candidate.name}]을 잠식했습니다! (누적: ${b.corruptedTerritories.length}곳)`);
+
+    return {
+      action: 'corrupted',
+      region: candidate,
+      prevData,
+      totalCorrupted: b.corruptedTerritories.length,
+      boss: this.getBossInfo()
+    };
+  }
+
+  // 보스 토벌 성공 또는 교사 수동 정화 시: 모든 잠식 영토 일괄 대정화(Purification)
+  purifyAllTerritories(gameState) {
+    this.ensureBossInitialized();
+    const b = this.data.currentBoss;
+    if (!b || !b.corruptedTerritories || b.corruptedTerritories.length === 0) {
+      return [];
+    }
+
+    const purifiedList = [];
+
+    b.corruptedTerritories.forEach(entry => {
+      const region = gameState?.regions ? gameState.regions[entry.regionId] : null;
+      if (region) {
+        region.isCorrupted = false;
+        region.corruptedByBoss = null;
+        region.corruptedTheme = null;
+
+        if (entry.prevData && entry.prevData.ownerId && entry.prevData.ownerId !== 'boss') {
+          // 원래 소유자/학급으로 완벽 복원
+          region.ownerId = entry.prevData.ownerId;
+          region.ownerName = entry.prevData.ownerName;
+          region.ownerColor = entry.prevData.ownerColor;
+          region.ownerAvatar = entry.prevData.ownerAvatar;
+          region.capturedBy = entry.prevData.capturedBy;
+          region.capturedById = entry.prevData.capturedById;
+          // 대정화 선물: 무료 방어막 +1 강화 (최소 2단계, 최대 5단계)
+          region.shield = Math.min(5, Math.max(2, (entry.prevData.shield || 1) + 1));
+        } else {
+          // 원래 중립이었던 곳: 중립 상태 복원
+          region.ownerId = null;
+          region.ownerName = null;
+          region.ownerColor = null;
+          region.ownerAvatar = null;
+          region.capturedBy = null;
+          region.capturedById = null;
+          region.shield = 0;
+        }
+
+        purifiedList.push(region);
+      }
+    });
+
+    const count = b.corruptedTerritories.length;
+    b.corruptedTerritories = [];
+    this.saveSeasonData();
+    console.log(`✨ [영토 대정화 완료] 잠식되었던 ${count}곳의 모든 영토가 정화되었습니다!`);
+
+    return purifiedList;
   }
 
   // 학생: 보스 타격 기록

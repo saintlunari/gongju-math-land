@@ -2077,7 +2077,50 @@ class GongjuMap {
     const shieldText = el ? el.shieldText : document.getElementById(`shield-text-${reg.id}`);
     const nodeEl = el ? el.node : document.getElementById(`region-node-${reg.id}`);
 
-    if (reg.ownerId) {
+    if (reg.isCorrupted || reg.ownerId === 'boss') {
+      // ⚠️ 보스 잠식 영토 렌더링 (4대 보스 고유 비주얼 테마)
+      const themeKey = reg.corruptedTheme || reg.corruptedByBoss || (this.currentBoss?.bossId) || 'boss_dragon';
+      const corruptionThemes = {
+        boss_dragon: { fill: '#0C4A6E', stroke: '#38BDF8', icon: '🌊', badge: '🌊수몰', aura: '#0284C7' },
+        boss_goblin: { fill: '#365314', stroke: '#84CC16', icon: '🌰', badge: '🌰가시', aura: '#65A30D' },
+        boss_golem: { fill: '#292524', stroke: '#A8A29E', icon: '🗿', badge: '🗿석화', aura: '#78716C' },
+        boss_phoenix: { fill: '#7F1D1D', stroke: '#F97316', icon: '🔥', badge: '🔥화염', aura: '#EA580C' }
+      };
+      const theme = corruptionThemes[themeKey] || corruptionThemes.boss_dragon;
+
+      pathEl.style.fill = theme.fill;
+      pathEl.style.stroke = theme.stroke;
+      pathEl.style.strokeWidth = '2px';
+      pathEl.classList.add('is-corrupted-territory');
+      pathEl.classList.remove('is-conquered');
+      if (nodeEl) nodeEl.classList.add('is-corrupted-node');
+
+      if (avatarBg) {
+        avatarBg.style.fill = '#1E1B4B';
+        avatarBg.style.stroke = theme.stroke;
+      }
+      if (avatarIcon) avatarIcon.textContent = theme.icon;
+
+      if (ownerPill) ownerPill.style.display = 'block';
+      if (ownerText) {
+        ownerText.textContent = theme.badge;
+        ownerText.style.fill = '#FDE047';
+      }
+
+      if (shieldBadge) shieldBadge.style.display = 'none';
+
+      if (auraEl) {
+        auraEl.style.display = 'block';
+        auraEl.style.stroke = theme.aura;
+        auraEl.style.strokeWidth = '3px';
+        auraEl.style.strokeDasharray = '3 2';
+      }
+    } else if (reg.ownerId) {
+      pathEl.style.stroke = '';
+      pathEl.style.strokeWidth = '';
+      pathEl.classList.remove('is-corrupted-territory');
+      if (nodeEl) nodeEl.classList.remove('is-corrupted-node');
+
       pathEl.style.fill = reg.ownerColor;
       pathEl.classList.add('is-conquered');
 
@@ -2088,12 +2131,16 @@ class GongjuMap {
       if (avatarIcon) avatarIcon.textContent = reg.ownerAvatar || '👑';
 
       if (ownerPill) ownerPill.style.display = 'block';
-      if (ownerText) ownerText.textContent = reg.ownerName ? reg.ownerName.slice(0, 3) : '';
+      if (ownerText) {
+        ownerText.textContent = reg.ownerName ? reg.ownerName.slice(0, 3) : '';
+        ownerText.style.fill = '';
+      }
 
       if (shieldBadge) shieldBadge.style.display = 'block';
       if (shieldText) shieldText.textContent = `🛡️${reg.shield}`;
 
       if (auraEl) {
+        auraEl.style.strokeDasharray = '';
         if (reg.shield >= 3) {
           auraEl.style.display = 'block';
           auraEl.style.stroke = '#FFD700';
@@ -2107,8 +2154,13 @@ class GongjuMap {
         }
       }
     } else {
-      pathEl.style.fill = '#E8F5E9';
+      pathEl.style.stroke = '';
+      pathEl.style.strokeWidth = '';
+      pathEl.classList.remove('is-corrupted-territory');
       pathEl.classList.remove('is-conquered');
+      if (nodeEl) nodeEl.classList.remove('is-corrupted-node');
+
+      pathEl.style.fill = '#E8F5E9';
 
       if (avatarBg) {
         avatarBg.style.fill = '#F5F5F5';
@@ -2118,13 +2170,34 @@ class GongjuMap {
 
       if (ownerPill) ownerPill.style.display = 'none';
       if (shieldBadge) shieldBadge.style.display = 'none';
-      if (auraEl) auraEl.style.display = 'none';
+      if (auraEl) {
+        auraEl.style.display = 'none';
+        auraEl.style.strokeDasharray = '';
+      }
     }
 
     if (reg.isUnderAttack && nodeEl) {
       nodeEl.classList.add('under-attack');
       setTimeout(() => nodeEl.classList.remove('under-attack'), 1500);
     }
+  }
+
+  // 대정화 발생 시 해당 영토들에 황금빛 빛기둥 및 팡파르 팝아웃 연출
+  triggerPurifyAnimation(regionIds = []) {
+    if (!regionIds || regionIds.length === 0) return;
+    regionIds.forEach(id => {
+      const regId = (typeof id === 'string') ? id : (id.id || id.regionId);
+      const el = this.domCache ? this.domCache[regId] : null;
+      const node = el ? el.node : document.getElementById(`region-node-${regId}`);
+      if (node) {
+        node.classList.remove('purify-sparkle');
+        void node.offsetWidth;
+        node.classList.add('purify-sparkle');
+        setTimeout(() => {
+          node.classList.remove('purify-sparkle');
+        }, 3200);
+      }
+    });
   }
 
   // O(1) 영토 선택 전환

@@ -325,6 +325,16 @@ io.on('connection', (socket) => {
     const region = gameState.regions[regionId];
     if (!region) return;
 
+    // 보스에게 잠식된 영토는 일반 퀴즈로 도전 불가 (보스 토벌전 안내)
+    if (region.isCorrupted) {
+      socket.emit('challenge_error', {
+        regionId,
+        regionName: region.name,
+        message: '⚠️ 보스의 어둠에 잠식된 영토입니다! 먼저 보스 토벌전에 참전하여 보스를 물리쳐야 정화됩니다!'
+      });
+      return;
+    }
+
     const player = gameState.players[socket.id];
     if (!player) return;
 
@@ -444,6 +454,22 @@ io.on('connection', (socket) => {
         text: `🎉 [시즌 보스 대격퇴!] 공주시 전역의 학생들이 힘을 합쳐 [${hitResult.boss.name}]을 물리쳤습니다! MVP: [${hitResult.mvp ? hitResult.mvp.name : '공주시 수호대'}]`
       });
 
+      // 대정화(Purification) 실행: 빼앗겼던 모든 잠식 영토 일괄 복구 + 신성 방어막 보너스
+      const purifiedRegions = seasonManager.purifyAllTerritories(gameState);
+      if (purifiedRegions && purifiedRegions.length > 0) {
+        io.emit('boss_territory_purified', {
+          purifiedRegions: purifiedRegions.map(r => ({ id: r.id, name: r.name, ownerName: r.ownerName, shield: r.shield })),
+          count: purifiedRegions.length
+        });
+        purifiedRegions.forEach(r => {
+          io.emit('region_updated', {
+            region: r,
+            event: 'purified',
+            text: `✨ [영토 대정화!] [${r.name}]이(가) 보스의 어둠에서 해방되어 복구되었습니다!`
+          });
+        });
+      }
+
       io.emit('ranking_updated', { ranking: calculateRanking() });
       io.emit('stats_updated', { stats: gameState.stats, ranking: calculateRanking() });
 
@@ -496,6 +522,15 @@ io.on('connection', (socket) => {
     const region = gameState.regions[regionId];
     const player = gameState.players[socket.id];
     if (!region || !player || !success) return;
+
+    if (region.isCorrupted) {
+      socket.emit('challenge_error', {
+        regionId,
+        regionName: region.name,
+        message: '⚠️ 보스에게 잠식된 영토입니다! 보스를 토벌해야 영토가 정화됩니다.'
+      });
+      return;
+    }
 
     const isTeamMode = (gameState.settings.gameMode === 'team');
     const team = (isTeamMode && player.teamId) ? TEAMS[player.teamId] : null;
@@ -724,6 +759,90 @@ io.on('connection', (socket) => {
           currentBoss: seasonManager.getBossInfo()
         });
         break;
+
+      case 'update_boss_corruption_settings': {
+        const updated = seasonManager.setCorruptionSettings(payload);
+        io.emit('boss_corruption_settings_updated', {
+          settings: seasonManager.getCorruptionSettings(),
+          countdown: seasonManager.getCorruptionCountdown()
+        });
+        io.emit('broadcast_notice', {
+          type: 'settings_change',
+          text: `⚙️ [교사 설정] 보스 영토 침식: ${updated.enabled ? 'ON' : 'OFF'} (주기: ${Math.round(updated.intervalSec / 60)}분, 최대: ${updated.maxCount >= 999 ? '무제한' : updated.maxCount + '곳'})`
+        });
+        break;
+      }
+
+      case 'trigger_instant_corruption': {
+        const corruptionResult = seasonManager.corruptNextTerritory(gameState);
+        if (corruptionResult) {
+          if (corruptionResult.action === 'corrupted') {
+            io.emit('boss_territory_corrupted', {
+              region: corruptionResult.region,
+              boss: seasonManager.getBossInfo(),
+              totalCorrupted: corruptionResult.totalCorrupted
+            });
+            io.emit('region_updated', {
+              region: corruptionResult.region,
+              event: 'corrupted',
+              text: `🚨 [영토 잠식] 보스가 [${corruptionResult.region.name}]을 잠식했습니다!`
+            });
+            io.emit('ranking_updated', { ranking: calculateRanking() });
+            io.emit('broadcast_notice', {
+              type: 'boss_corrupted',
+              text: `🚨 [수동 테스트] 보스가 [${corruptionResult.region.name}]을(를) 잠식했습니다! (잠식: ${corruptionResult.totalCorrupted}/${seasonManager.getMaxCorrupted()}곳)`
+            });
+          } else if (corruptionResult.action === 'defended_by_shield') {
+            io.emit('boss_shield_defended', {
+              region: corruptionResult.region,
+              regionId: corruptionResult.regionId,
+              regionName: corruptionResult.regionName,
+              shieldRemaining: corruptionResult.shieldRemaining,
+              boss: seasonManager.getBossInfo()
+            });
+            io.emit('region_updated', {
+              region: corruptionResult.region,
+              event: 'shield_defended',
+              text: `🛡️ [방어막 수호] [${corruptionResult.regionName}]의 방어막이 침식을 막아냈습니다!`
+            });
+            io.emit('ranking_updated', { ranking: calculateRanking() });
+            io.emit('broadcast_notice', {
+              type: 'shield_defend',
+              text: `🛡️ [방어 성공!] [${corruptionResult.regionName}]의 방어막이 잠식을 막아냈습니다!`
+            });
+          } else if (corruptionResult.action === 'max_limit_reached') {
+            socket.emit('teacher_notice', {
+              text: `⚠️ 이미 최대 잠식 한도(${corruptionResult.maxCount}곳)에 도달했습니다.`
+            });
+          }
+        } else {
+          socket.emit('teacher_notice', {
+            text: `⚠️ 보스가 진행 중이 아니거나 더 이상 잠식할 영토가 없습니다.`
+          });
+        }
+        break;
+      }
+
+      case 'trigger_instant_purification': {
+        const purifiedRegions = seasonManager.purifyAllTerritories(gameState);
+        io.emit('boss_territory_purified', {
+          purifiedRegions: purifiedRegions.map(r => ({ id: r.id, name: r.name, ownerName: r.ownerName, shield: r.shield })),
+          count: purifiedRegions.length
+        });
+        purifiedRegions.forEach(r => {
+          io.emit('region_updated', {
+            region: r,
+            event: 'purified',
+            text: `✨ [영토 대정화] [${r.name}]이(가) 정화되어 복구되었습니다!`
+          });
+        });
+        io.emit('ranking_updated', { ranking: calculateRanking() });
+        io.emit('broadcast_notice', {
+          type: 'purification',
+          text: `✨ [교사 명령] 잠식되었던 ${purifiedRegions.length}곳의 영토가 즉시 모두 정화되었습니다!`
+        });
+        break;
+      }
     }
   });
 
@@ -740,6 +859,60 @@ io.on('connection', (socket) => {
     }
   });
 });
+
+// 매 1초마다 보스 영토 침식 타이머 틱 동기화 및 자동 침식 실행
+setInterval(() => {
+  const boss = seasonManager.getBossInfo();
+  if (boss && boss.status === 'raging' && !boss.isDefeated) {
+    const corruptionResult = seasonManager.tickCorruption(gameState);
+
+    // 1초 단위로 교사 및 학생 화면에 침식 카운트다운 동기화
+    io.emit('boss_corruption_tick', {
+      countdown: seasonManager.getCorruptionCountdown(),
+      totalCorrupted: seasonManager.getCorruptedCount(),
+      maxCorrupted: seasonManager.getMaxCorrupted(),
+      settings: seasonManager.getCorruptionSettings()
+    });
+
+    if (corruptionResult) {
+      if (corruptionResult.action === 'corrupted') {
+        io.emit('boss_territory_corrupted', {
+          region: corruptionResult.region,
+          boss: seasonManager.getBossInfo(),
+          totalCorrupted: corruptionResult.totalCorrupted
+        });
+        io.emit('region_updated', {
+          region: corruptionResult.region,
+          event: 'corrupted',
+          text: `🚨 [영토 잠식] 보스가 [${corruptionResult.region.name}]을 잠식했습니다!`
+        });
+        io.emit('ranking_updated', { ranking: calculateRanking() });
+        io.emit('broadcast_notice', {
+          type: 'boss_corrupted',
+          text: `🚨 [긴급 경보] 보스 [${boss.name}]이(가) [${corruptionResult.region.name}]을(를) 잠식했습니다! (잠식 영토: ${corruptionResult.totalCorrupted}/${seasonManager.getMaxCorrupted()}곳)`
+        });
+      } else if (corruptionResult.action === 'defended_by_shield') {
+        io.emit('boss_shield_defended', {
+          region: corruptionResult.region,
+          regionId: corruptionResult.regionId,
+          regionName: corruptionResult.regionName,
+          shieldRemaining: corruptionResult.shieldRemaining,
+          boss: seasonManager.getBossInfo()
+        });
+        io.emit('region_updated', {
+          region: corruptionResult.region,
+          event: 'shield_defended',
+          text: `🛡️ [방어막 수호] [${corruptionResult.regionName}]의 방어막이 침식을 막아냈습니다! (남은 방어막: ${corruptionResult.shieldRemaining})`
+        });
+        io.emit('ranking_updated', { ranking: calculateRanking() });
+        io.emit('broadcast_notice', {
+          type: 'shield_defend',
+          text: `🛡️ [방어 성공!] [${corruptionResult.regionName}]의 방어막이 보스의 잠식을 막아냈습니다! (남은 방어막: ${corruptionResult.shieldRemaining})`
+        });
+      }
+    }
+  }
+}, 1000);
 
 // 매 10초마다 일요일 시즌 마감 자동 검사 & 시즌 타이머 틱 동기화
 setInterval(() => {

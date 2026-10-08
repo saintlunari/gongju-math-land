@@ -223,6 +223,38 @@ function initSocket() {
     addBattleLog('🛡️ 교사 권한으로 보스 토벌전이 일시 종료되었습니다.');
   });
 
+  // [보스 영토 침식] 실시간 1초 카운트다운 동기화
+  socket.on('boss_corruption_tick', (data) => {
+    updateCorruptionCountdownUI(data);
+  });
+
+  // [보스 영토 침식] 침식 발생 수신
+  socket.on('boss_territory_corrupted', (data) => {
+    window.soundManager.playBossInvasion();
+    triggerInvasionFlash();
+    addBattleLog(`🚨 [긴급 경보] 보스 [${data.boss?.shortName || '보스'}]이(가) [${data.region.name}]을 잠식했습니다! (잠식: ${data.totalCorrupted}곳)`);
+  });
+
+  // [보스 영토 침식] 방어막 수호 성공 수신
+  socket.on('boss_shield_defended', (data) => {
+    window.soundManager.playShieldDefend();
+    addBattleLog(`🛡️ [방어 성공!] [${data.regionName}]의 방어막이 보스의 잠식을 막아냈습니다! (남은 방어막: ${data.shieldRemaining})`);
+  });
+
+  // [보스 영토 침식] 대정화 완료 수신
+  socket.on('boss_territory_purified', (data) => {
+    window.soundManager.playPurification();
+    if (data.purifiedRegions && data.purifiedRegions.length > 0) {
+      teacherMap.triggerPurifyAnimation(data.purifiedRegions);
+    }
+    addBattleLog(`✨ [영토 대정화] 잠식되었던 ${data.count || data.purifiedRegions?.length || 0}곳의 모든 영토가 황금빛으로 복구되었습니다!`);
+  });
+
+  // 침식 설정 동기화
+  socket.on('boss_corruption_settings_updated', (data) => {
+    syncCorruptionSettingsUI(data.settings, data.countdown);
+  });
+
   // 시즌 종료 & 새 시즌 자동/수동 리셋
   socket.on('season_ended_and_reset', (data) => {
     teacherMap.setSelectedRegion(null);
@@ -597,6 +629,45 @@ function initControls() {
     const modal = document.getElementById('teacher-boss-victory-modal');
     if (modal) modal.style.display = 'none';
   });
+
+  // [보스 영토 침식] 설정 변경 리스너
+  document.getElementById('teacher-corruption-toggle')?.addEventListener('change', (e) => {
+    window.soundManager.playClick();
+    socket.emit('teacher_control', {
+      action: 'update_boss_corruption_settings',
+      payload: { enabled: e.target.value === 'true' }
+    });
+  });
+
+  document.getElementById('teacher-corruption-interval')?.addEventListener('change', (e) => {
+    window.soundManager.playClick();
+    socket.emit('teacher_control', {
+      action: 'update_boss_corruption_settings',
+      payload: { intervalSec: parseInt(e.target.value, 10) }
+    });
+  });
+
+  document.getElementById('teacher-corruption-max')?.addEventListener('change', (e) => {
+    window.soundManager.playClick();
+    socket.emit('teacher_control', {
+      action: 'update_boss_corruption_settings',
+      payload: { maxCount: parseInt(e.target.value, 10) }
+    });
+  });
+
+  // [보스 영토 침식] 1곳 즉시 잠식 테스트
+  document.getElementById('btn-instant-corrupt')?.addEventListener('click', () => {
+    window.soundManager.playClick();
+    socket.emit('teacher_control', { action: 'trigger_instant_corruption' });
+  });
+
+  // [보스 영토 침식] 전체 즉시 정화
+  document.getElementById('btn-instant-purify')?.addEventListener('click', () => {
+    if (confirm('잠식되었던 모든 영토를 즉시 복구(정화)하시겠습니까?')) {
+      window.soundManager.playClick();
+      socket.emit('teacher_control', { action: 'trigger_instant_purification' });
+    }
+  });
 }
 
 // 주간 시즌 뱃지 및 D-Day 타이머 갱신
@@ -722,6 +793,17 @@ function updateBossHUD(boss) {
     if (mvpNameEl) mvpNameEl.textContent = top.name;
     if (mvpDmgEl) mvpDmgEl.textContent = top.damage;
   }
+
+  // 영토 침식 상태 및 설정 동기화
+  if (boss.corruptionSettings) {
+    syncCorruptionSettingsUI(boss.corruptionSettings, boss.nextCorruptionCountdown);
+    updateCorruptionCountdownUI({
+      countdown: boss.nextCorruptionCountdown,
+      totalCorrupted: boss.corruptedCount || 0,
+      maxCorrupted: boss.corruptionSettings.maxCount,
+      settings: boss.corruptionSettings
+    });
+  }
 }
 
 // [시즌 보스 레이드] 보스 토벌 성공 대형 시상 모달
@@ -752,4 +834,63 @@ function showBossDefeatedVictory(data) {
   }
 
   modal.style.display = 'flex';
+}
+
+// [보스 영토 침식] 실시간 카운트다운 게이지 및 수치 업데이트
+function updateCorruptionCountdownUI(data) {
+  if (!data) return;
+  const timerText = document.getElementById('teacher-corruption-timer-text');
+  const bar = document.getElementById('teacher-corruption-bar');
+  const countEl = document.getElementById('teacher-corrupted-count');
+  const maxEl = document.getElementById('teacher-corrupted-max');
+
+  const countdown = (typeof data.countdown === 'number') ? data.countdown : 300;
+  const mins = Math.floor(countdown / 60);
+  const secs = countdown % 60;
+  if (timerText) {
+    timerText.textContent = `${mins}분 ${String(secs).padStart(2, '0')}초`;
+  }
+
+  const intervalSec = (data.settings && data.settings.intervalSec) ? data.settings.intervalSec : 300;
+  const pct = Math.max(0, Math.min(100, Math.round((countdown / intervalSec) * 100)));
+  if (bar) {
+    bar.style.width = `${pct}%`;
+  }
+
+  if (countEl) countEl.textContent = data.totalCorrupted || 0;
+  if (maxEl) maxEl.textContent = (data.maxCorrupted >= 999) ? '무제한' : (data.maxCorrupted || 8);
+}
+
+// [보스 영토 침식] 교사용 설정 컨트롤 동기화
+function syncCorruptionSettingsUI(settings, countdown) {
+  if (!settings) return;
+  const toggleEl = document.getElementById('teacher-corruption-toggle');
+  const intervalEl = document.getElementById('teacher-corruption-interval');
+  const maxEl = document.getElementById('teacher-corruption-max');
+
+  if (toggleEl && settings.enabled !== undefined) {
+    toggleEl.value = String(settings.enabled);
+  }
+  if (intervalEl && settings.intervalSec) {
+    intervalEl.value = String(settings.intervalSec);
+  }
+  if (maxEl && settings.maxCount) {
+    maxEl.value = String(settings.maxCount);
+  }
+}
+
+// [보스 영토 침식] 침식 발생 시 붉은 화면 긴급 플래시 경보
+function triggerInvasionFlash() {
+  const flash = document.createElement('div');
+  flash.style.position = 'fixed';
+  flash.style.inset = '0';
+  flash.style.background = 'rgba(239, 68, 68, 0.35)';
+  flash.style.pointerEvents = 'none';
+  flash.style.zIndex = '9999';
+  flash.style.transition = 'opacity 0.6s ease-out';
+  document.body.appendChild(flash);
+  setTimeout(() => {
+    flash.style.opacity = '0';
+    setTimeout(() => flash.remove(), 600);
+  }, 100);
 }

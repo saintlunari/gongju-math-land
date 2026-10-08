@@ -65,54 +65,52 @@
     }
   ],
   "currentBoss": {
-    "bossId": "boss_dragon",
-    "name": "금강의 수호신 '금강대룡'",
-    "shortName": "금강대룡",
-    "title": "🌊 공주시 금강을 뒤흔드는 푸른 전설의 용",
-    "icon": "🐉",
-    "badgeId": "badge_boss_dragon",
-    "badgeName": "금강룡 토벌 영웅",
-    "badgeDesc": "금강을 지키는 거대 수호용과의 곱셈 대결에서 승리한 영웅!",
+    "bossId": "boss_goblin",
+    "name": "정안 숲의 '대왕 알밤 도깨비'",
+    "shortName": "알밤 도깨비",
+    "title": "🌰 정안면 알밤을 몽땅 탐내는 거대 도깨비",
+    "icon": "🌰👹",
+    "badgeId": "badge_boss_goblin",
+    "badgeName": "알밤 도깨비 퇴치단",
+    "badgeDesc": "정안 알밤을 지키기 위해 알밤 도깨비를 물리친 용감한 수호대!",
     "maxHp": 10000,
     "currentHp": 10000,
-    "regionId": "ri_134",
-    "targetX": 614.1,
-    "targetY": 507.4,
-    "cx": 575,
-    "cy": 465,
+    "regionId": "ri_21",
+    "targetX": 658.9,
+    "targetY": 203.4,
+    "cx": 708,
+    "cy": 185,
     "isDefeated": false,
-    "status": "sleeping",
-    "location": "공주시 금강 본류 (신관동·금성동 사이)",
-    "story": "공주시 한가운데를 흐르는 금강에서 깨어난 거대 수호용 금강대룡! 2학년 친구들의 단합된 구구단 주문으로 용을 감동시켜 공주시를 수호하게 만들어야 합니다!",
+    "status": "raging",
+    "location": "정안면 평정리 (알밤특구)",
+    "story": "정안면의 달콤한 알밤을 모두 가져가려는 장난꾸러기 거대 도깨비! 구구단 문제를 척척 풀어 도깨비의 방망이를 멈추게 하세요!",
     "rewardScore": 100,
-    "summonedAt": "2026-10-08T03:18:33.394Z",
+    "summonedAt": "2026-10-08T04:10:10.330Z",
     "defeatedAt": null,
-    "totalDamageDealt": 25,
-    "contributors": {
-      "7NJ_0V-88iG3_fbxAAAA": {
-        "id": "7NJ_0V-88iG3_fbxAAAA",
-        "name": "테스트학생",
-        "avatar": "🐯",
-        "color": "#2563EB",
-        "teamId": "team_1",
-        "damage": 25,
-        "hits": 1
-      }
-    },
+    "totalDamageDealt": 0,
+    "contributors": {},
     "teamDamage": {
-      "team_1": 25,
+      "team_1": 0,
       "team_2": 0,
       "team_3": 0,
       "team_4": 0
     },
-    "lastHitLog": [
+    "lastHitLog": [],
+    "corruptedTerritories": [
       {
-        "studentName": "테스트학생",
-        "avatar": "🐯",
-        "teamId": "team_1",
-        "damage": 25,
-        "isCrit": false,
-        "time": 1791429513399
+        "regionId": "ri_21",
+        "regionName": "평정리",
+        "town": "정안면",
+        "prevData": {
+          "ownerId": null,
+          "ownerName": null,
+          "ownerColor": null,
+          "ownerAvatar": null,
+          "capturedBy": null,
+          "capturedById": null,
+          "shield": 0
+        },
+        "corruptedAt": "2026-10-08T04:15:22.944Z"
       }
     ]
   }

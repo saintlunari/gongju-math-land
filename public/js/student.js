@@ -218,6 +218,17 @@ function initMap() {
 
 // 영토 클릭 시 처리
 function handleRegionClick(regionId, regionData) {
+  const reg = regionData || gongjuMap?.getRegion(regionId) || gongjuMap?.regionsData?.[regionId];
+  if (reg && (reg.isCorrupted || reg.ownerId === 'boss')) {
+    window.soundManager.playWrong();
+    const regName = reg.name || '이 마을';
+    const bossName = gongjuMap?.currentBoss?.shortName || gongjuMap?.currentBoss?.name || '거대 보스';
+    if (confirm(`⚠️ [보스 잠식 영토]\n\n[${regName}]은 현재 ${bossName}의 어둠에 잠식되어 있습니다!\n\n일반 퀴즈로는 점령할 수 없으며, 학급 전체가 힘을 모아 보스를 물리쳐야 정화됩니다.\n\n지금 바로 보스 토벌전에 참전하시겠습니까?`)) {
+      enterBossRaid();
+    }
+    return;
+  }
+
   // 1분 잠금 상태 확인 (3스트라이크 오답 페널티)
   if (isRegionLocked(regionId)) {
     const remainSec = getRemainingLockSeconds(regionId);
@@ -953,6 +964,62 @@ socket.on('boss_dismissed', (data) => {
   updateStudentBossBanner(data.boss);
   showTicker('🛡️ 보스 토벌전이 일시 종료되었습니다.');
 });
+
+// [보스 영토 침식] 실시간 1초 카운트다운 동기화
+socket.on('boss_corruption_tick', (data) => {
+  const countdownEl = document.getElementById('sbb-countdown-text');
+  if (countdownEl && data) {
+    const mins = Math.floor(data.countdown / 60);
+    const secs = data.countdown % 60;
+    countdownEl.textContent = `⏳ 잠식: ${mins}분 ${String(secs).padStart(2, '0')}초`;
+  }
+});
+
+// [보스 영토 침식] 침식 발생 수신
+socket.on('boss_territory_corrupted', (data) => {
+  window.soundManager.playBossInvasion();
+  triggerStudentInvasionFlash();
+  showTicker(`🚨 [긴급 경보] 보스가 [${data.region.name}]을 잠식했습니다! 협동 토벌전으로 보스를 물리쳐주세요!`);
+});
+
+// [보스 영토 침식] 방어막 수호 성공 수신
+socket.on('boss_shield_defended', (data) => {
+  window.soundManager.playShieldDefend();
+  showTicker(`🛡️ [방어 성공!] [${data.regionName}]의 방어막이 보스의 잠식을 막아냈습니다!`);
+});
+
+// [보스 영토 침식] 대정화 완료 수신
+socket.on('boss_territory_purified', (data) => {
+  window.soundManager.playPurification();
+  if (data.purifiedRegions && data.purifiedRegions.length > 0) {
+    gongjuMap.triggerPurifyAnimation(data.purifiedRegions);
+  }
+  showTicker(`✨ [영토 대정화 축제] 빼앗겼던 ${data.count || data.purifiedRegions?.length || 0}곳의 모든 땅이 우리 품으로 복구되었습니다!`);
+});
+
+// 서버 오류/도전 차단 안내 수신
+socket.on('challenge_error', (data) => {
+  window.soundManager.playWrong();
+  showTicker(data.message || '⚠️ 도전할 수 없는 영토입니다.');
+  if (gongjuMap) gongjuMap.setSelectedRegion(null);
+  const quizModal = document.getElementById('quiz-modal');
+  if (quizModal) quizModal.style.display = 'none';
+});
+
+function triggerStudentInvasionFlash() {
+  const flash = document.createElement('div');
+  flash.style.position = 'fixed';
+  flash.style.inset = '0';
+  flash.style.background = 'rgba(239, 68, 68, 0.35)';
+  flash.style.pointerEvents = 'none';
+  flash.style.zIndex = '9999';
+  flash.style.transition = 'opacity 0.6s ease-out';
+  document.body.appendChild(flash);
+  setTimeout(() => {
+    flash.style.opacity = '0';
+    setTimeout(() => flash.remove(), 600);
+  }, 100);
+}
 
 socket.on('boss_not_active', (data) => {
   showTicker('⚔️ 현재 진행 중인 보스 토벌전이 없습니다.');

@@ -164,6 +164,57 @@ class SoundManager {
     notes.forEach(n => this.playTone(n.f, 'triangle', n.d, n.t, 0.3));
   }
 
+  // [보스 영토 침식] 땅을 빼앗길 때 지진/경보음
+  playBossInvasion() {
+    if (this.muted) return;
+    this.init();
+    if (!this.ctx) return;
+
+    const now = this.ctx.currentTime;
+    // 묵직한 톱니파 하강 진동
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(160, now);
+    osc.frequency.exponentialRampToValueAtTime(45, now + 0.6);
+
+    gain.gain.setValueAtTime(0.26, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.65);
+
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+
+    osc.start(now);
+    osc.stop(now + 0.65);
+
+    // 긴급 경보 비프 2회
+    this.playTone(440, 'triangle', 0.12, 0.15, 0.2);
+    this.playTone(370, 'triangle', 0.22, 0.32, 0.22);
+  }
+
+  // [방어막 수호] 보스의 잠식을 방어막으로 튕겨냈을 때 챙그랑 실드음
+  playShieldDefend() {
+    if (this.muted) return;
+    this.playTone(880, 'sine', 0.12, 0.0, 0.25);
+    this.playTone(1320, 'triangle', 0.2, 0.05, 0.28);
+    this.playTone(1760, 'sine', 0.3, 0.12, 0.22);
+  }
+
+  // [영토 대정화] 보스 격퇴 후 빼앗긴 땅이 황금빛으로 정화될 때 성스러운 축제 벨소리
+  playPurification() {
+    if (this.muted) return;
+    const chimeNotes = [
+      { f: 587.33, t: 0.0, d: 0.2 },  // D5
+      { f: 739.99, t: 0.1, d: 0.2 },  // F#5
+      { f: 880.00, t: 0.2, d: 0.22 }, // A5
+      { f: 1174.66, t: 0.32, d: 0.25 },// D6
+      { f: 1479.98, t: 0.45, d: 0.35 },// F#6
+      { f: 1760.00, t: 0.6, d: 0.55 }  // A6
+    ];
+    chimeNotes.forEach(n => this.playTone(n.f, 'sine', n.d, n.t, 0.24));
+  }
+
   // 사운드 토글
   toggleMute() {
     this.muted = !this.muted;

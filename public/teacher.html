@@ -263,6 +263,62 @@
             중지
           </button>
         </div>
+
+        <!-- 영토 침식 시스템 제어 섹션 -->
+        <div style="margin-top: 14px; padding-top: 10px; border-top: 1px dashed rgba(236, 72, 153, 0.4);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <span style="font-size: 0.82rem; font-weight: 800; color: #F472B6;">⚠️ 영토 침식 (땅 빼앗기)</span>
+            <select id="teacher-corruption-toggle" class="select-control" style="width: auto; padding: 2px 8px; font-size: 0.78rem; font-weight: bold; background: #0F172A; border-color: #EC4899; color: #F472B6;">
+              <option value="true" selected>✅ 켜짐 (ON)</option>
+              <option value="false">❌ 끄기 (OFF)</option>
+            </select>
+          </div>
+
+          <!-- 실시간 침식 카운트다운 게이지 & 현황 -->
+          <div id="teacher-corruption-status-box" style="background: rgba(0,0,0,0.3); border-radius: 8px; padding: 8px; margin-bottom: 8px; border: 1px solid rgba(236, 72, 153, 0.2);">
+            <div style="display: flex; justify-content: space-between; font-size: 0.78rem; color: #CBD5E1; margin-bottom: 4px;">
+              <span>⏳ 다음 잠식 카운트다운</span>
+              <span id="teacher-corruption-timer-text" style="color: #FCD34D; font-weight: 800;">5분 00초</span>
+            </div>
+            <div style="height: 6px; background: #1E293B; border-radius: 3px; overflow: hidden;">
+              <div id="teacher-corruption-bar" style="height: 100%; width: 100%; background: linear-gradient(90deg, #EC4899, #EF4444); transition: width 1s linear;"></div>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 0.72rem; color: #94A3B8; margin-top: 4px;">
+              <span>잠식된 영토: <b id="teacher-corrupted-count" style="color: #F87171;">0</b>곳</span>
+              <span>최대 한도: <b id="teacher-corrupted-max">8</b>곳</span>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 8px;">
+            <div>
+              <label style="font-size: 0.75rem; color: #94A3B8; display: block; margin-bottom: 2px;">침식 주기</label>
+              <select id="teacher-corruption-interval" class="select-control" style="font-size: 0.78rem; background: #0F172A;">
+                <option value="180">3분 (빠름)</option>
+                <option value="300" selected>5분 (기본 권장)</option>
+                <option value="600">10분 (여유)</option>
+                <option value="900">15분 (초급)</option>
+              </select>
+            </div>
+            <div>
+              <label style="font-size: 0.75rem; color: #94A3B8; display: block; margin-bottom: 2px;">최대 잠식 한도</label>
+              <select id="teacher-corruption-max" class="select-control" style="font-size: 0.78rem; background: #0F172A;">
+                <option value="5">최대 5곳</option>
+                <option value="8" selected>최대 8곳 (기본)</option>
+                <option value="12">최대 12곳</option>
+                <option value="999">무제한</option>
+              </select>
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 6px;">
+            <button id="btn-instant-corrupt" class="btn-ctrl" style="flex: 1; background: #4C1D95; color: #E9D5FF; font-size: 0.75rem; padding: 6px; border-radius: 6px; border: 1px solid #7C3AED; cursor: pointer;" title="즉시 다음 인접 영토 1곳을 잠식합니다">
+              ⚠️ 1곳 잠식 테스트
+            </button>
+            <button id="btn-instant-purify" class="btn-ctrl" style="flex: 1; background: #065F46; color: #A7F3D0; font-size: 0.75rem; padding: 6px; border-radius: 6px; border: 1px solid #059669; cursor: pointer;" title="잠식된 모든 영토를 즉시 복구/정화합니다">
+              ✨ 즉시 전체 정화
+            </button>
+          </div>
+        </div>
       </div>
 
     </aside>
