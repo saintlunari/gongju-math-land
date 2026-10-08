@@ -854,7 +854,7 @@ body {
   font-weight: 800;
 }
 
-/* 지도 위 거대 보스 마커 및 관련 영토 실시간 연출 스타일 */
+/* 지도 위 거대 보스 마커, 연결 점선 및 출현 마을 앵커 실시간 연출 스타일 */
 .boss-map-marker {
   cursor: pointer;
   pointer-events: auto;
@@ -863,19 +863,101 @@ body {
 }
 
 .boss-map-marker:hover {
-  transform: scale(1.12);
+  transform: scale(1.1);
   filter: drop-shadow(0 0 16px rgba(236, 72, 153, 0.85));
 }
 
 @keyframes bossMarkerFloating {
   0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-6px); }
+  50% { transform: translateY(-5px); }
+}
+
+/* 마을과 보스 핀을 잇는 부드러운 네온 골드 점선 (Connector Line) */
+.boss-leader-line-glow {
+  fill: none;
+  stroke: rgba(245, 158, 11, 0.35);
+  stroke-width: 6px;
+  stroke-linecap: round;
+  pointer-events: none;
+  filter: blur(2px);
+}
+
+.boss-leader-line {
+  fill: none;
+  stroke: #F59E0B;
+  stroke-width: 2.6px;
+  stroke-dasharray: 6 4;
+  stroke-linecap: round;
+  pointer-events: none;
+  filter: drop-shadow(0 0 6px rgba(245, 158, 11, 0.9));
+  animation: bossLeaderDash 1.2s linear infinite;
+}
+
+@keyframes bossLeaderDash {
+  to {
+    stroke-dashoffset: -20;
+  }
+}
+
+/* 마을 출현지 타겟 앵커 */
+.boss-town-anchor {
+  cursor: pointer;
+  pointer-events: auto;
+  transition: transform 0.2s ease;
+}
+
+.boss-town-anchor:hover {
+  transform: scale(1.15);
+}
+
+.boss-anchor-pulse {
+  fill: none;
+  stroke: #F59E0B;
+  stroke-width: 2px;
+  animation: anchorPulse 1.8s infinite ease-out;
+}
+
+@keyframes anchorPulse {
+  0% {
+    r: 6;
+    opacity: 0.9;
+    stroke-width: 2.5px;
+  }
+  100% {
+    r: 22;
+    opacity: 0;
+    stroke-width: 0.5px;
+  }
+}
+
+.boss-anchor-ring {
+  fill: #1E1B4B;
+  stroke: #F59E0B;
+  stroke-width: 2.2px;
+  filter: drop-shadow(0 0 6px rgba(245, 158, 11, 0.8));
+}
+
+.boss-anchor-dot {
+  fill: #EF4444;
+}
+
+.boss-anchor-tag-bg {
+  fill: rgba(15, 23, 42, 0.92);
+  stroke: #F59E0B;
+  stroke-width: 1px;
+}
+
+.boss-anchor-tag-text {
+  fill: #FDE047;
+  font-size: 7.5px;
+  font-weight: 800;
+  letter-spacing: -0.2px;
 }
 
 .boss-pulse-ring {
   fill: none;
   stroke: #EC4899;
-  stroke-width: 2.5px;
+  stroke-width: 2px;
   stroke-dasharray: 4 2;
   animation: bossRingExpand 2.2s infinite ease-out;
   transform-origin: 0 0;
@@ -888,26 +970,26 @@ body {
 
 @keyframes bossRingExpand {
   0% {
-    r: 26;
+    r: 20;
     opacity: 0.9;
-    stroke-width: 3.5px;
+    stroke-width: 2.5px;
   }
   100% {
-    r: 68;
+    r: 52;
     opacity: 0;
-    stroke-width: 1px;
+    stroke-width: 0.8px;
   }
 }
 
 .boss-avatar-bg {
   fill: #3B0764;
   stroke: #F472B6;
-  stroke-width: 3.5px;
-  filter: drop-shadow(0 0 12px rgba(236, 72, 153, 0.7));
+  stroke-width: 3px;
+  filter: drop-shadow(0 0 10px rgba(236, 72, 153, 0.7));
 }
 
 .boss-map-icon {
-  font-size: 26px;
+  font-size: 22px;
   user-select: none;
   pointer-events: none;
 }
@@ -915,13 +997,13 @@ body {
 .boss-name-badge-bg {
   fill: #0F172A;
   stroke: #F59E0B;
-  stroke-width: 2px;
+  stroke-width: 1.8px;
   filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.5));
 }
 
 .boss-name-badge-text {
   fill: #FDE047;
-  font-size: 10.5px;
+  font-size: 9.5px;
   font-weight: 900;
   letter-spacing: -0.2px;
 }
@@ -929,7 +1011,7 @@ body {
 .boss-hp-bar-bg {
   fill: #1E293B;
   stroke: #475569;
-  stroke-width: 1.5px;
+  stroke-width: 1.2px;
 }
 
 .boss-hp-bar-fill {
@@ -939,13 +1021,13 @@ body {
 
 .boss-hp-bar-text {
   fill: #FFFFFF;
-  font-size: 7.5px;
+  font-size: 7px;
   font-weight: 800;
 }
 
 .boss-territory-active .region-path {
   stroke: #EC4899 !important;
-  stroke-width: 4px !important;
+  stroke-width: 3.8px !important;
   stroke-dasharray: 6 3;
   animation: bossTerritoryStrokePulse 1.5s infinite ease-in-out !important;
 }
@@ -958,8 +1040,8 @@ body {
   }
   50% {
     stroke: #F59E0B;
-    stroke-width: 5.5px;
-    filter: drop-shadow(0 0 14px rgba(245, 158, 11, 0.9));
+    stroke-width: 5px;
+    filter: drop-shadow(0 0 12px rgba(245, 158, 11, 0.9));
   }
 }
 

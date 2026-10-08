@@ -1833,8 +1833,8 @@ class GongjuMap {
     this.svg.addEventListener('click', (e) => {
       if (this.dragDistance > 12) return;
 
-      // 시즌 보스 마커 클릭 감지
-      const bossMarker = e.target.closest('.boss-map-marker');
+      // 시즌 보스 마커 및 마을 출현지 앵커 클릭 감지
+      const bossMarker = e.target.closest('.boss-map-marker, .boss-town-anchor');
       if (bossMarker) {
         window.soundManager?.playClick();
         if (this.options.onBossClick && this.currentBoss) {
@@ -2220,7 +2220,7 @@ class GongjuMap {
     }
   }
 
-  // 시즌 보스 거대 몬스터 지도 마커 및 침공 영토 표시
+  // 시즌 보스 거대 몬스터 지도 마커 및 침공 영토 표시 (점선 연결 및 안전 위치)
   setBoss(bossInfo) {
     this.currentBoss = bossInfo;
     const bossLayer = this.svg ? (this.svg.querySelector('.boss-marker-layer') || document.getElementById(`${this.container.id}-boss-layer`)) : null;
@@ -2229,7 +2229,7 @@ class GongjuMap {
     if (this.activeBossRegionId) {
       const prevEl = this.domCache ? this.domCache[this.activeBossRegionId] : null;
       const prevNode = prevEl ? prevEl.node : document.getElementById(`region-node-${this.activeBossRegionId}`);
-      if (prevNode) prevNode.classList.remove('boss-territory-active');
+      if (prevNode && prevNode.classList) prevNode.classList.remove('boss-territory-active');
       this.activeBossRegionId = null;
     }
 
@@ -2241,59 +2241,125 @@ class GongjuMap {
       return;
     }
 
-    // 4대 보스 기본 출현 좌표 및 영토 매핑
-    const bossCoords = {
-      boss_dragon: { cx: 580, cy: 475, regionId: 'ri_137', shortName: '금강대룡' },
-      boss_goblin: { cx: 658.9, cy: 203.4, regionId: 'ri_21', shortName: '알밤 도깨비' },
-      boss_golem: { cx: 647.7, cy: 757.2, regionId: 'ri_91', shortName: '바위 골렘' },
-      boss_phoenix: { cx: 627.7, cy: 528.6, regionId: 'ri_127', shortName: '황금 불사조' }
+    // 4대 보스 기본 출현 마을 및 "다른 마을을 가리지 않는 안전한 인접 공간" 좌표 프리셋
+    const bossPresets = {
+      boss_dragon: {
+        regionId: 'ri_134', // 웅진동 금성동 (금강 본류 남안)
+        shortName: '금강대룡',
+        targetX: 614.1,
+        targetY: 507.4,
+        pinX: 575, // 금성동 북서쪽, 넓은 금강 수면 상공 (마을 가림 일체 없음)
+        pinY: 465
+      },
+      boss_goblin: {
+        regionId: 'ri_21', // 정안면 평정리
+        shortName: '알밤 도깨비',
+        targetX: 658.9,
+        targetY: 203.4,
+        pinX: 708, // 평정리 우측 인근 여백 (다른 마을 가림 일체 없음)
+        pinY: 185
+      },
+      boss_golem: {
+        regionId: 'ri_91', // 계룡면 중장리 (갑사)
+        shortName: '바위 골렘',
+        targetX: 730.1,
+        targetY: 748.5,
+        pinX: 785, // 중장리(갑사) 동쪽 계룡산 국립공원 바위 자락 (마을 가림 일체 없음)
+        pinY: 730
+      },
+      boss_phoenix: {
+        regionId: 'ri_127', // 중학동 (공산성)
+        shortName: '황금 불사조',
+        targetX: 627.7,
+        targetY: 528.6,
+        pinX: 668, // 공산성 북동쪽 금강 상공 (원도심 작은 동들 가림 일체 없음)
+        pinY: 490
+      }
     };
 
-    const preset = bossCoords[bossInfo.bossId] || { cx: 580, cy: 475, regionId: 'ri_137', shortName: '시즌 보스' };
-    const cx = (typeof bossInfo.cx === 'number') ? bossInfo.cx : preset.cx;
-    const cy = (typeof bossInfo.cy === 'number') ? bossInfo.cy : preset.cy;
-    const regionId = bossInfo.regionId || preset.regionId;
-    const displayName = bossInfo.shortName || preset.shortName || bossInfo.name || '시즌 보스';
+    const preset = bossPresets[bossInfo.bossId];
+    const regionId = bossInfo.regionId || (preset ? preset.regionId : 'ri_137');
+    const displayName = bossInfo.shortName || (preset ? preset.shortName : bossInfo.name) || '시즌 보스';
 
-    // 해당 영토 하이라이트 클래스 부여
+    // 해당 마을 영토 중심 좌표 구하기
+    const targetRegion = this.layout.find(r => r.id === regionId);
+    const targetX = targetRegion ? targetRegion.cx : (preset ? preset.targetX : 565);
+    const targetY = targetRegion ? targetRegion.cy : (preset ? preset.targetY : 512);
+
+    // 보스 마커 핀 위치 결정 (다른 마을을 가리지 않도록 마을 인근 안전 공간에 배치)
+    let pinX, pinY;
+    if (preset && (!bossInfo.regionId || bossInfo.regionId === preset.regionId)) {
+      pinX = preset.pinX;
+      pinY = preset.pinY;
+    } else {
+      // 커스텀 영토이거나 좌표 오버라이드가 있을 때
+      pinX = (typeof bossInfo.cx === 'number') ? bossInfo.cx : (targetX + 58);
+      pinY = (typeof bossInfo.cy === 'number') ? bossInfo.cy : (targetY - 38);
+    }
+
+    // 해당 영토 하이라이트 클래스 부여 (테두리 펄스 글로우)
     this.activeBossRegionId = regionId;
     const targetEl = this.domCache ? this.domCache[regionId] : null;
     const targetNode = targetEl ? targetEl.node : document.getElementById(`region-node-${regionId}`);
-    if (targetNode) {
+    if (targetNode && targetNode.classList) {
       targetNode.classList.add('boss-territory-active');
     }
+
+    // 베지어 곡선 연결선 제어점 계산 (마을에서 보스 핀으로 부드럽게 아치형으로 휘어지는 곡선)
+    const midX = (targetX + pinX) / 2;
+    const midY = (targetY + pinY) / 2;
+    const dx = pinX - targetX;
+    const dy = pinY - targetY;
+    const ctrlX = midX - dy * 0.16;
+    const ctrlY = midY + dx * 0.16;
 
     const hpPercent = bossInfo.hpPercent !== undefined
       ? bossInfo.hpPercent
       : (bossInfo.maxHp > 0 ? Math.round((bossInfo.currentHp / bossInfo.maxHp) * 100) : 0);
 
-    const hpBarW = 76;
+    const hpBarW = 68;
     const hpFillW = Math.max(0, Math.min(hpBarW - 2, (hpBarW - 2) * (hpPercent / 100)));
 
     bossLayer.innerHTML = `
-      <g class="boss-map-marker" data-boss-id="${bossInfo.bossId || ''}" transform="translate(${cx}, ${cy})">
+      <!-- 1. 마을 출현지 타겟 앵커 (해당 마을 중심점) -->
+      <g class="boss-town-anchor" data-region-id="${regionId}" style="cursor: pointer;">
+        <circle class="boss-anchor-pulse" cx="${targetX}" cy="${targetY}" r="15" />
+        <circle class="boss-anchor-ring" cx="${targetX}" cy="${targetY}" r="7.5" />
+        <circle class="boss-anchor-dot" cx="${targetX}" cy="${targetY}" r="3.5" />
+        <g class="boss-anchor-tag" transform="translate(${targetX}, ${targetY + 16})">
+          <rect x="-24" y="-7" width="48" height="13" rx="4" class="boss-anchor-tag-bg" />
+          <text x="0" y="2.5" text-anchor="middle" class="boss-anchor-tag-text">📍 출현지</text>
+        </g>
+      </g>
+
+      <!-- 2. 해당 마을과 보스 핀을 잇는 부드러운 점선 (Leader Line) -->
+      <path class="boss-leader-line-glow" d="M ${targetX},${targetY} Q ${ctrlX},${ctrlY} ${pinX},${pinY}" />
+      <path class="boss-leader-line" d="M ${targetX},${targetY} Q ${ctrlX},${ctrlY} ${pinX},${pinY}" />
+
+      <!-- 3. 마을 근처 안전 여백에 위치한 보스 마커 핀 (다른 마을 가림 없음) -->
+      <g class="boss-map-marker" data-boss-id="${bossInfo.bossId || ''}" transform="translate(${pinX}, ${pinY})">
         <!-- 펄스 파동 오라 2중 링 -->
-        <circle class="boss-pulse-ring ring-1" cx="0" cy="0" r="38" />
-        <circle class="boss-pulse-ring ring-2" cx="0" cy="0" r="54" />
+        <circle class="boss-pulse-ring ring-1" cx="0" cy="0" r="30" />
+        <circle class="boss-pulse-ring ring-2" cx="0" cy="0" r="42" />
 
         <!-- 바닥 그림자 -->
-        <ellipse cx="0" cy="22" rx="26" ry="9" fill="rgba(0,0,0,0.45)" filter="blur(2px)" />
+        <ellipse cx="0" cy="18" rx="20" ry="7" fill="rgba(0,0,0,0.4)" filter="blur(2px)" />
 
         <!-- 보스 아바타 외곽 원 및 아이콘 -->
-        <circle class="boss-avatar-bg" cx="0" cy="0" r="26" />
-        <text class="boss-map-icon" x="0" y="8" text-anchor="middle">${bossInfo.icon || '🐉'}</text>
+        <circle class="boss-avatar-bg" cx="0" cy="0" r="22" />
+        <text class="boss-map-icon" x="0" y="7" text-anchor="middle">${bossInfo.icon || '🐉'}</text>
 
         <!-- 보스 이름 라벨 뱃지 -->
-        <g class="boss-map-label" transform="translate(0, -34)">
-          <rect class="boss-name-badge-bg" x="-58" y="-12" width="116" height="22" rx="11" />
+        <g class="boss-map-label" transform="translate(0, -30)">
+          <rect class="boss-name-badge-bg" x="-52" y="-10" width="104" height="20" rx="10" />
           <text class="boss-name-badge-text" x="0" y="2" text-anchor="middle">⚠️ ${displayName}</text>
         </g>
 
         <!-- 실시간 HP 게이지 바 -->
-        <g class="boss-map-hp-bar" transform="translate(0, 34)">
-          <rect class="boss-hp-bar-bg" x="-38" y="-6" width="${hpBarW}" height="12" rx="6" />
-          <rect class="boss-hp-bar-fill" x="-37" y="-5" width="${hpFillW}" height="10" rx="5" />
-          <text class="boss-hp-bar-text" x="0" y="2.5" text-anchor="middle">${bossInfo.currentHp} HP (${hpPercent}%)</text>
+        <g class="boss-map-hp-bar" transform="translate(0, 28)">
+          <rect class="boss-hp-bar-bg" x="-34" y="-5.5" width="${hpBarW}" height="11" rx="5.5" />
+          <rect class="boss-hp-bar-fill" x="-33" y="-4.5" width="${hpFillW}" height="9" rx="4.5" />
+          <text class="boss-hp-bar-text" x="0" y="2" text-anchor="middle">${bossInfo.currentHp} HP (${hpPercent}%)</text>
         </g>
       </g>
     `;
