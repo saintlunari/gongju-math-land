@@ -105,6 +105,65 @@ class SoundManager {
     this.playTone(freq * 1.25, 'sine', 0.2, 0.08, 0.25);
   }
 
+  // [시즌 보스 레이드] 보스 출현 포효 사운드
+  playBossRoar() {
+    if (this.muted) return;
+    this.init();
+    if (!this.ctx) return;
+
+    const now = this.ctx.currentTime;
+    // 웅장한 저음 신스 스윕
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(120, now);
+    osc.frequency.exponentialRampToValueAtTime(55, now + 0.8);
+
+    gain.gain.setValueAtTime(0.28, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.9);
+
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+
+    osc.start(now);
+    osc.stop(now + 0.9);
+
+    // 보조 진동음
+    setTimeout(() => {
+      this.playTone(180, 'triangle', 0.5, 0, 0.2);
+    }, 200);
+  }
+
+  // [시즌 보스 레이드] 보스 타격 피격 사운드
+  playBossHit(isCrit = false) {
+    if (this.muted) return;
+    if (isCrit) {
+      // 크리티컬 히트 (강렬한 타격음)
+      this.playTone(320, 'sawtooth', 0.18, 0, 0.3);
+      this.playTone(640, 'triangle', 0.25, 0.04, 0.35);
+      this.playTone(960, 'sine', 0.3, 0.08, 0.25);
+    } else {
+      // 일반 타격음
+      this.playTone(260, 'sawtooth', 0.15, 0, 0.25);
+      this.playTone(520, 'triangle', 0.18, 0.03, 0.2);
+    }
+  }
+
+  // [시즌 보스 레이드] 보스 토벌 승리 팡파르 사운드
+  playBossVictory() {
+    if (this.muted) return;
+    const notes = [
+      { f: 523.25, t: 0.0, d: 0.15 },  // C5
+      { f: 659.25, t: 0.15, d: 0.15 }, // E5
+      { f: 783.99, t: 0.3, d: 0.18 },  // G5
+      { f: 1046.50, t: 0.48, d: 0.25 },// C6
+      { f: 783.99, t: 0.75, d: 0.15 }, // G5
+      { f: 1046.50, t: 0.92, d: 0.6 }  // 높은 C6 길게
+    ];
+    notes.forEach(n => this.playTone(n.f, 'triangle', n.d, n.t, 0.3));
+  }
+
   // 사운드 토글
   toggleMute() {
     this.muted = !this.muted;

@@ -1,8 +1,114 @@
 {
-  "currentSeason": 1,
-  "seasonName": "제 1시즌 (2학년 반 대항전)",
-  "seasonStart": "2026-10-02T00:00:00.000Z",
-  "seasonEnd": "2026-10-04T14:59:59.999Z",
-  "lastResetKey": "2026-W40",
-  "hallOfFame": []
+  "currentSeason": 2,
+  "seasonName": "제 2시즌 (2학년 반 대항전)",
+  "seasonStart": "2026-10-04T15:00:04.938Z",
+  "seasonEnd": "2026-10-11T14:59:59.999Z",
+  "lastResetKey": "2026-W41",
+  "hallOfFame": [
+    {
+      "season": 1,
+      "seasonName": "제 1시즌 (2학년 반 대항전)",
+      "startedAt": "2026-10-02T00:00:00.000Z",
+      "endedAt": "2026-10-04T15:00:04.938Z",
+      "winningClass": {
+        "id": "team_1",
+        "name": "2학년 1반",
+        "avatar": "1️⃣",
+        "color": "#2563EB",
+        "territories": 0,
+        "score": 0,
+        "memberCount": 0
+      },
+      "classRankings": [
+        {
+          "id": "team_1",
+          "name": "2학년 1반",
+          "avatar": "1️⃣",
+          "color": "#2563EB",
+          "territories": 0,
+          "score": 0,
+          "memberCount": 0
+        },
+        {
+          "id": "team_2",
+          "name": "2학년 2반",
+          "avatar": "2️⃣",
+          "color": "#EA580C",
+          "territories": 0,
+          "score": 0,
+          "memberCount": 0
+        },
+        {
+          "id": "team_3",
+          "name": "2학년 3반",
+          "avatar": "3️⃣",
+          "color": "#DC2626",
+          "territories": 0,
+          "score": 0,
+          "memberCount": 0
+        },
+        {
+          "id": "team_4",
+          "name": "2학년 4반",
+          "avatar": "4️⃣",
+          "color": "#16A34A",
+          "territories": 0,
+          "score": 0,
+          "memberCount": 0
+        }
+      ],
+      "mvpStudent": {
+        "name": "집계 없음",
+        "score": 0,
+        "territories": 0
+      }
+    }
+  ],
+  "currentBoss": {
+    "bossId": "boss_dragon",
+    "name": "금강의 수호신 '금강대룡'",
+    "shortName": "금강대룡",
+    "title": "🌊 공주시 금강을 뒤흔드는 푸른 전설의 용",
+    "icon": "🐉",
+    "badgeId": "badge_boss_dragon",
+    "badgeName": "금강룡 토벌 영웅",
+    "badgeDesc": "금강을 지키는 거대 수호용과의 곱셈 대결에서 승리한 영웅!",
+    "maxHp": 20,
+    "currentHp": 0,
+    "isDefeated": true,
+    "status": "defeated",
+    "location": "공주시 금강 본류 (신관동·금성동 사이)",
+    "story": "공주시 한가운데를 흐르는 금강에서 깨어난 거대 수호용 금강대룡! 2학년 친구들의 단합된 구구단 주문으로 용을 감동시켜 공주시를 수호하게 만들어야 합니다!",
+    "rewardScore": 100,
+    "summonedAt": "2026-10-07T03:41:35.219Z",
+    "defeatedAt": "2026-10-07T03:41:35.223Z",
+    "totalDamageDealt": 20,
+    "contributors": {
+      "Aohj75jeWgvNGHb-AAAB": {
+        "id": "Aohj75jeWgvNGHb-AAAB",
+        "name": "이순신",
+        "avatar": "🦁",
+        "color": "#2563EB",
+        "teamId": "team_1",
+        "damage": 20,
+        "hits": 1
+      }
+    },
+    "teamDamage": {
+      "team_1": 20,
+      "team_2": 0,
+      "team_3": 0,
+      "team_4": 0
+    },
+    "lastHitLog": [
+      {
+        "studentName": "이순신",
+        "avatar": "🦁",
+        "teamId": "team_1",
+        "damage": 20,
+        "isCrit": true,
+        "time": 1791344495223
+      }
+    ]
+  }
 }

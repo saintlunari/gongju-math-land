@@ -4,7 +4,7 @@ const { Server } = require('socket.io');
 const os = require('os');
 const QRCode = require('qrcode');
 const { validateQuestionBank, getQuestionsForRegion } = require('./question_bank');
-const { SeasonManager } = require('./season_manager');
+const { SeasonManager, SEASON_BOSS_TEMPLATES } = require('./season_manager');
 
 // 서버 시작 시 문제 은행 100% 무결성 검증 (불변식 검사)
 validateQuestionBank();
@@ -226,10 +226,11 @@ function calculateRanking() {
 io.on('connection', (socket) => {
   console.log(`[접속] 새 소켓 연결: ${socket.id}`);
 
-  // 접속 즉시 현재 게임 모드와 팀 목록을 전송 (학생이 로비 입장 시 바로 반을 확인하고 선택할 수 있도록 함)
+  // 접속 즉시 현재 게임 모드와 팀 목록 및 시즌 보스 정보를 전송
   socket.emit('init_game_info', {
     gameMode: gameState.settings.gameMode,
-    teams: TEAMS
+    teams: TEAMS,
+    boss: seasonManager.getBossInfo()
   });
 
   // 교사인지 학생인지 등록
@@ -251,6 +252,8 @@ io.on('connection', (socket) => {
       gameState,
       teams: TEAMS,
       season: seasonManager.getSeasonInfo(),
+      boss: seasonManager.getBossInfo(),
+      bossTemplates: SEASON_BOSS_TEMPLATES,
       ranking: calculateRanking()
     });
   });
@@ -277,12 +280,13 @@ io.on('connection', (socket) => {
 
     console.log(`[학생 입장] ${player.name} (${player.avatar}, ${player.color}, team: ${player.teamId || '개인'})`);
 
-    // 개인에게 입장 성공 전송 (시즌 정보 포함)
+    // 개인에게 입장 성공 전송 (시즌 정보 및 보스 정보 포함)
     socket.emit('joined_success', {
       player,
       gameState,
       teams: TEAMS,
-      season: seasonManager.getSeasonInfo()
+      season: seasonManager.getSeasonInfo(),
+      boss: seasonManager.getBossInfo()
     });
 
     // 전체에게 상태 갱신 방송
@@ -361,6 +365,117 @@ io.on('connection', (socket) => {
       player.solvedCount += 1;
       gameState.stats.totalSolved += 1;
       io.emit('stats_updated', { stats: gameState.stats, ranking: calculateRanking() });
+    }
+  });
+
+  // [시즌 보스 레이드] 보스 공격 퀴즈 요청
+  socket.on('request_boss_quiz', () => {
+    const boss = seasonManager.getBossInfo();
+    if (boss.status !== 'raging' || boss.isDefeated) {
+      socket.emit('boss_not_active', { boss });
+      return;
+    }
+
+    const quizzes = generateQuiz(gameState.settings, 1, 'boss');
+    socket.emit('receive_boss_quiz', {
+      quiz: quizzes[0],
+      boss
+    });
+  });
+
+  // [시즌 보스 레이드] 보스 공격 답안 제출
+  socket.on('submit_boss_attack', ({ quizId, answer, chosenVal, streak = 0 }) => {
+    const player = gameState.players[socket.id];
+    if (!player) return;
+
+    const boss = seasonManager.getBossInfo();
+    if (boss.status !== 'raging' || boss.isDefeated) {
+      socket.emit('boss_not_active', { boss });
+      return;
+    }
+
+    const isCorrect = (chosenVal === answer);
+    if (!isCorrect) {
+      socket.emit('boss_attack_result', {
+        isCorrect: false,
+        damage: 0,
+        isCrit: false,
+        boss: seasonManager.getBossInfo()
+      });
+      return;
+    }
+
+    // 정답 시 데미지 산출: 기본 10 데미지 + 연속 콤보 크리티컬 보너스 (최대 30)
+    const currentStreak = (streak || 0) + 1;
+    const isCrit = (currentStreak >= 2);
+    const damage = isCrit ? Math.min(30, 10 + currentStreak * 5) : 10;
+
+    player.score += damage;
+    player.solvedCount += 1;
+    gameState.stats.totalSolved += 1;
+
+    const hitResult = seasonManager.recordBossHit(player, damage, isCrit);
+    if (!hitResult) return;
+
+    if (hitResult.defeated) {
+      // 🏆 보스 토벌 대성공! 모든 접속 학생에게 특별 뱃지 및 보너스 점수 일괄 수여
+      Object.values(gameState.players).forEach(p => {
+        p.score += (hitResult.rewardScore || 100);
+        if (!p.badges) p.badges = [];
+        if (hitResult.rewardBadge && !p.badges.some(b => b.id === hitResult.rewardBadge.id)) {
+          p.badges.push(hitResult.rewardBadge);
+        }
+      });
+
+      io.emit('boss_defeated', {
+        boss: hitResult.boss,
+        mvp: hitResult.mvp,
+        winningTeamId: hitResult.winningTeamId,
+        rewardBadge: hitResult.rewardBadge,
+        rewardScore: hitResult.rewardScore || 100,
+        text: `🎉 [시즌 보스 대격퇴!] 공주시 전역의 학생들이 힘을 합쳐 [${hitResult.boss.name}]을 물리쳤습니다! MVP: [${hitResult.mvp ? hitResult.mvp.name : '공주시 수호대'}]`
+      });
+
+      io.emit('ranking_updated', { ranking: calculateRanking() });
+      io.emit('stats_updated', { stats: gameState.stats, ranking: calculateRanking() });
+
+      socket.emit('boss_attack_result', {
+        isCorrect: true,
+        damage: hitResult.actualDamage,
+        isCrit: hitResult.isCrit,
+        boss: hitResult.boss,
+        myScore: player.score,
+        nextQuiz: null
+      });
+
+    } else {
+      // 일반 타격 피격 방송
+      io.emit('boss_hit', {
+        studentName: player.name,
+        avatar: player.avatar,
+        color: player.color,
+        teamId: player.teamId,
+        damage: hitResult.actualDamage,
+        isCrit: hitResult.isCrit,
+        currentHp: hitResult.boss.currentHp,
+        maxHp: hitResult.boss.maxHp,
+        hpPercent: hitResult.boss.hpPercent,
+        lastHitLog: hitResult.boss.lastHitLog,
+        topContributors: hitResult.boss.topContributors,
+        teamDamage: hitResult.boss.teamDamage
+      });
+
+      io.emit('stats_updated', { stats: gameState.stats, ranking: calculateRanking() });
+
+      const nextQuizzes = generateQuiz(gameState.settings, 1, 'boss');
+      socket.emit('boss_attack_result', {
+        isCorrect: true,
+        damage: hitResult.actualDamage,
+        isCrit: hitResult.isCrit,
+        boss: hitResult.boss,
+        myScore: player.score,
+        nextQuiz: nextQuizzes[0]
+      });
     }
   });
 
@@ -560,6 +675,37 @@ io.on('connection', (socket) => {
 
       case 'get_hall_of_fame':
         socket.emit('hall_of_fame_data', { hallOfFame: seasonManager.data.hallOfFame || [] });
+        break;
+
+      case 'summon_boss': {
+        const { maxHp, bossTemplateId } = payload || {};
+        const summonedBoss = seasonManager.summonBoss(maxHp, bossTemplateId);
+        io.emit('boss_summoned', {
+          boss: summonedBoss,
+          templates: SEASON_BOSS_TEMPLATES
+        });
+        io.emit('broadcast_notice', {
+          type: 'boss_summon',
+          text: `⚠️ [긴급 출동] 공주시에 시즌 보스 [${summonedBoss.icon} ${summonedBoss.name}] 출현! 모든 학생은 지금 바로 협동 토벌전에 참전하세요!`
+        });
+        break;
+      }
+
+      case 'dismiss_boss': {
+        const dismissedBoss = seasonManager.dismissBoss();
+        io.emit('boss_dismissed', { boss: dismissedBoss });
+        io.emit('broadcast_notice', {
+          type: 'boss_dismiss',
+          text: `🛡️ 선생님에 의해 보스 토벌전이 일시 종료되었습니다.`
+        });
+        break;
+      }
+
+      case 'get_boss_templates':
+        socket.emit('boss_templates_data', {
+          templates: SEASON_BOSS_TEMPLATES,
+          currentBoss: seasonManager.getBossInfo()
+        });
         break;
     }
   });

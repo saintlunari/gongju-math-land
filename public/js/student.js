@@ -41,6 +41,14 @@ let activeShieldItem = false;
 let currentChallengeWrongCount = 0; // 한 영토 5문제 중 오답 횟수 (3번 틀리면 1분 잠금)
 const lockedRegions = {}; // { [regionId]: { unlockTime, regionName, intervalId } }
 
+// [시즌 보스 레이드 전역 상태]
+let currentBossState = null;
+let currentBossQuiz = null;
+let bossStreak = 0;
+let myBossDamageDealt = 0;
+let bossInputMode = 'multiple'; // 'multiple' or 'keypad'
+let bossUserInputValue = '';
+
 // 아바타 목록 16종
 const AVATARS = ['🐯', '🐻', '🐰', '🦊', '🐼', '🐶', '🐱', '🦁', '🦄', '👑', '🤴', '🧙', '🐿️', '🐸', '🦉', '🐨'];
 
@@ -61,6 +69,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initMapControls();
   initStatsAndFeatures();
   initItemsAndBadges();
+  initBossRaid();
 });
 
 // 1. 로비 초기화 (프로필 및 반 설정)
@@ -783,6 +792,9 @@ socket.on('init_game_info', (data) => {
   if (data.teams) serverTeams = data.teams;
   renderTeamGrid();
   adaptGameModeUI(serverGameMode);
+  if (data.boss) {
+    updateStudentBossBanner(data.boss);
+  }
 });
 
 // 소켓 실시간 이벤트 수신 (입장 완료)
@@ -795,11 +807,102 @@ socket.on('joined_success', (data) => {
   if (data.season) {
     updateStudentSeasonDisplay(data.season);
   }
+  if (data.boss) {
+    updateStudentBossBanner(data.boss);
+  }
 });
 
 // 시즌 실시간 틱 수신
 socket.on('season_tick', (seasonInfo) => {
   updateStudentSeasonDisplay(seasonInfo);
+  if (seasonInfo.boss) {
+    updateStudentBossBanner(seasonInfo.boss);
+  }
+});
+
+// [시즌 보스 레이드] 보스 소환 이벤트 수신
+socket.on('boss_summoned', (data) => {
+  updateStudentBossBanner(data.boss);
+  updateBossModalUI(data.boss);
+  window.soundManager.playBossRoar();
+  showTicker(`⚠️ [긴급] 공주시에 시즌 보스 [${data.boss.icon} ${data.boss.name}] 출현! 협동 토벌전에 참여하세요!`);
+});
+
+// [시즌 보스 레이드] 보스 피격 동기화
+socket.on('boss_hit', (data) => {
+  updateStudentBossBanner(data);
+  updateBossModalUI(data);
+  const fill = document.getElementById('boss-card-hp-fill');
+  const nums = document.getElementById('boss-card-hp-text');
+  const pct = document.getElementById('boss-card-hp-pct');
+  if (fill) fill.style.width = `${data.hpPercent}%`;
+  if (nums) nums.textContent = `${data.currentHp} / ${data.maxHp} HP`;
+  if (pct) pct.textContent = `${data.hpPercent}%`;
+});
+
+// [시즌 보스 레이드] 보스 퀴즈 수신
+socket.on('receive_boss_quiz', (data) => {
+  currentBossQuiz = data.quiz;
+  updateBossModalUI(data.boss);
+  renderBossQuiz();
+});
+
+// [시즌 보스 레이드] 보스 공격 결과 수신
+socket.on('boss_attack_result', (data) => {
+  if (data.isCorrect) {
+    bossStreak++;
+    myBossDamageDealt += data.damage;
+    const streakEl = document.getElementById('boss-my-streak');
+    const dmgEl = document.getElementById('boss-my-dmg');
+    if (streakEl) streakEl.textContent = `${bossStreak}연타`;
+    if (dmgEl) dmgEl.textContent = `${myBossDamageDealt} HP`;
+
+    showBossHitFx(data.damage, data.isCrit);
+    window.soundManager.playBossHit(data.isCrit);
+    updateBossModalUI(data.boss);
+    updateStudentBossBanner(data.boss);
+
+    if (data.myScore !== undefined) {
+      document.getElementById('my-score-display').textContent = data.myScore;
+    }
+
+    if (data.nextQuiz) {
+      currentBossQuiz = data.nextQuiz;
+      setTimeout(renderBossQuiz, 350);
+    }
+  } else {
+    bossStreak = 0;
+    const streakEl = document.getElementById('boss-my-streak');
+    if (streakEl) streakEl.textContent = '0연타';
+    window.soundManager.playWrong();
+    showFeedback(false, null, '공격이 빗나갔습니다! 다시 조준해보세요!');
+    bossUserInputValue = '';
+    const display = document.getElementById('boss-user-input');
+    if (display) display.textContent = '?';
+  }
+});
+
+// [시즌 보스 레이드] 보스 토벌 성공 수신
+socket.on('boss_defeated', (data) => {
+  const modal = document.getElementById('boss-raid-modal');
+  if (modal) modal.style.display = 'none';
+  showStudentBossVictory(data);
+  updateStudentBossBanner(data.boss);
+  showTicker(data.text);
+});
+
+// [시즌 보스 레이드] 보스 중지 수신
+socket.on('boss_dismissed', (data) => {
+  const modal = document.getElementById('boss-raid-modal');
+  if (modal) modal.style.display = 'none';
+  updateStudentBossBanner(data.boss);
+  showTicker('🛡️ 보스 토벌전이 일시 종료되었습니다.');
+});
+
+socket.on('boss_not_active', (data) => {
+  showTicker('⚔️ 현재 진행 중인 보스 토벌전이 없습니다.');
+  const modal = document.getElementById('boss-raid-modal');
+  if (modal) modal.style.display = 'none';
 });
 
 // 시즌 정기/수동 마감 및 새 시즌 개막
@@ -1185,3 +1288,273 @@ socket.on('challenge_locked', (data) => {
   showTicker(data.message || `⛔ [${regName}] 3번 오답 페널티로 ${remainSec}초 동안 도전할 수 없습니다!`);
   window.soundManager.playWrong();
 });
+
+// ==========================================================
+// [시즌 보스 레이드 (PVE 협동 모드)] 클라이언트 로직
+// ==========================================================
+
+function initBossRaid() {
+  // 참전 버튼
+  document.getElementById('btn-enter-boss-raid')?.addEventListener('click', () => {
+    window.soundManager.playClick();
+    enterBossRaid();
+  });
+
+  // 닫기 / 후퇴 버튼
+  document.getElementById('btn-close-boss-modal')?.addEventListener('click', () => {
+    window.soundManager.playClick();
+    const modal = document.getElementById('boss-raid-modal');
+    if (modal) modal.style.display = 'none';
+  });
+
+  // 모드 전환 버튼
+  document.getElementById('btn-boss-mode-mul')?.addEventListener('click', () => {
+    window.soundManager.playClick();
+    bossInputMode = 'multiple';
+    toggleBossModeButtons();
+    renderBossQuiz();
+  });
+  document.getElementById('btn-boss-mode-pad')?.addEventListener('click', () => {
+    window.soundManager.playClick();
+    bossInputMode = 'keypad';
+    toggleBossModeButtons();
+    renderBossQuiz();
+  });
+
+  // 오답 지우개 찬스
+  document.getElementById('btn-boss-eraser')?.addEventListener('click', () => {
+    if (myProfile.items.eraser <= 0) {
+      showTicker('🪄 지우개 찬스가 부족합니다! 콤보를 달성해 획득해보세요!');
+      return;
+    }
+    if (!currentBossQuiz || bossInputMode !== 'multiple') {
+      showTicker('🪄 오답 지우개는 4지선다형 모드에서 사용할 수 있습니다!');
+      return;
+    }
+    const buttons = Array.from(document.querySelectorAll('#boss-multiple-options .multiple-btn:not(.item-eliminated)'));
+    const wrongButtons = buttons.filter(btn => parseInt(btn.dataset.val, 10) !== currentBossQuiz.answer);
+    if (wrongButtons.length <= 1) return;
+
+    wrongButtons.sort(() => 0.5 - Math.random()).slice(0, 2).forEach(btn => {
+      btn.classList.add('item-eliminated');
+      btn.disabled = true;
+    });
+
+    myProfile.items.eraser--;
+    updateItemBadges();
+    updateBossEraserCount();
+    window.soundManager.playCorrect();
+    showTicker('🪄 오답 지우개 찬스 발동! 오답 2개가 사라졌습니다!');
+  });
+
+  // 보스 전용 키패드 터치 바인딩
+  const keypad = document.getElementById('boss-keypad-container');
+  if (keypad) {
+    keypad.addEventListener('click', (e) => {
+      const btn = e.target.closest('.key-btn');
+      if (!btn) return;
+      window.soundManager.playClick();
+      const val = btn.dataset.val;
+      if (val === 'clear') {
+        bossUserInputValue = '';
+      } else if (val === 'submit') {
+        if (bossUserInputValue) {
+          submitBossAttackAnswer(parseInt(bossUserInputValue, 10));
+        }
+        return;
+      } else {
+        if (bossUserInputValue.length < 3) {
+          bossUserInputValue += val;
+        }
+      }
+      const display = document.getElementById('boss-user-input');
+      if (display) display.textContent = bossUserInputValue || '?';
+    });
+  }
+
+  // 승리 모달 닫기
+  document.getElementById('btn-close-student-boss-vic')?.addEventListener('click', () => {
+    window.soundManager.playClick();
+    const modal = document.getElementById('student-boss-victory-modal');
+    if (modal) modal.style.display = 'none';
+  });
+}
+
+// 상단 보스 배너 UI 갱신
+function updateStudentBossBanner(boss) {
+  if (!boss) return;
+  currentBossState = boss;
+  const banner = document.getElementById('student-boss-banner');
+  if (!banner) return;
+
+  const isRaging = (boss.status === 'raging');
+  banner.style.display = isRaging ? 'flex' : 'none';
+
+  if (isRaging) {
+    const iconEl = document.getElementById('sbb-icon');
+    const titleEl = document.getElementById('sbb-title');
+    const fillEl = document.getElementById('sbb-hp-fill');
+    const textEl = document.getElementById('sbb-hp-text');
+
+    if (iconEl) iconEl.textContent = boss.icon || '🐉';
+    if (titleEl) titleEl.textContent = boss.name || '시즌 보스';
+    if (fillEl) fillEl.style.width = `${boss.hpPercent || 0}%`;
+    if (textEl) textEl.textContent = `${boss.currentHp} / ${boss.maxHp} HP (${boss.hpPercent}%)`;
+  }
+}
+
+// 보스 모달 상단 정보 갱신
+function updateBossModalUI(boss) {
+  if (!boss) return;
+  const iconEl = document.getElementById('boss-card-icon');
+  const nameEl = document.getElementById('boss-card-name');
+  const locEl = document.getElementById('boss-card-loc');
+  const fillEl = document.getElementById('boss-card-hp-fill');
+  const textEl = document.getElementById('boss-card-hp-text');
+  const pctEl = document.getElementById('boss-card-hp-pct');
+
+  if (iconEl) iconEl.textContent = boss.icon || '🐉';
+  if (nameEl) nameEl.textContent = boss.name || '시즌 보스';
+  if (locEl) locEl.textContent = boss.location || '공주시';
+  if (fillEl) fillEl.style.width = `${boss.hpPercent || 0}%`;
+  if (textEl) textEl.textContent = `${boss.currentHp} / ${boss.maxHp} HP`;
+  if (pctEl) pctEl.textContent = `${boss.hpPercent || 0}%`;
+}
+
+// 보스 토벌전 입장
+function enterBossRaid() {
+  const modal = document.getElementById('boss-raid-modal');
+  if (!modal) return;
+  updateBossModalUI(currentBossState);
+  updateBossEraserCount();
+  modal.style.display = 'flex';
+  socket.emit('request_boss_quiz');
+}
+
+// 지우개 개수 갱신
+function updateBossEraserCount() {
+  const el = document.getElementById('boss-eraser-count');
+  if (el) el.textContent = myProfile.items.eraser;
+}
+
+// 모드 토글 버튼 UI
+function toggleBossModeButtons() {
+  document.getElementById('btn-boss-mode-mul')?.classList.toggle('active', bossInputMode === 'multiple');
+  document.getElementById('btn-boss-mode-pad')?.classList.toggle('active', bossInputMode === 'keypad');
+}
+
+// 보스 퀴즈 렌더링
+function renderBossQuiz() {
+  if (!currentBossQuiz) return;
+  const quiz = currentBossQuiz;
+
+  const conceptBadge = document.getElementById('boss-quiz-concept');
+  const formulaEl = document.getElementById('boss-quiz-formula');
+  const visualEl = document.getElementById('boss-quiz-visual');
+  const inputDisplay = document.getElementById('boss-user-input');
+  const mulGrid = document.getElementById('boss-multiple-options');
+  const padContainer = document.getElementById('boss-keypad-container');
+
+  if (conceptBadge) conceptBadge.textContent = quiz.category || '곱셈구구';
+  if (formulaEl) formulaEl.textContent = quiz.formula || '식을 계산하세요';
+  if (visualEl) {
+    if (quiz.visual) {
+      visualEl.textContent = quiz.visual;
+      visualEl.style.display = 'block';
+    } else {
+      visualEl.style.display = 'none';
+    }
+  }
+
+  bossUserInputValue = '';
+  if (inputDisplay) inputDisplay.textContent = '?';
+
+  if (bossInputMode === 'multiple') {
+    if (mulGrid) {
+      mulGrid.style.display = 'grid';
+      mulGrid.innerHTML = (quiz.options || []).map(opt => `
+        <button class="multiple-btn boss-opt-btn" data-val="${opt}">${opt}</button>
+      `).join('');
+
+      mulGrid.querySelectorAll('.multiple-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          submitBossAttackAnswer(parseInt(btn.dataset.val, 10));
+        });
+      });
+    }
+    if (padContainer) padContainer.style.display = 'none';
+    if (inputDisplay) inputDisplay.style.display = 'none';
+  } else {
+    if (mulGrid) mulGrid.style.display = 'none';
+    if (padContainer) padContainer.style.display = 'block';
+    if (inputDisplay) inputDisplay.style.display = 'block';
+  }
+}
+
+// 보스 공격 답안 전송
+function submitBossAttackAnswer(chosenVal) {
+  if (!currentBossQuiz) return;
+  socket.emit('submit_boss_attack', {
+    quizId: currentBossQuiz.id,
+    answer: currentBossQuiz.answer,
+    chosenVal,
+    streak: bossStreak
+  });
+}
+
+// 보스 타격 피격 이펙트
+function showBossHitFx(damage, isCrit) {
+  const fx = document.getElementById('boss-hit-fx');
+  const text = document.getElementById('boss-hit-text');
+  const avatarBox = document.getElementById('boss-avatar-box');
+  if (!fx || !text) return;
+
+  text.textContent = isCrit ? `🔥 -${damage} HP! 크리티컬!!` : `💥 -${damage} HP!`;
+  text.className = isCrit ? 'boss-hit-text crit-hit' : 'boss-hit-text';
+  fx.style.display = 'flex';
+
+  if (avatarBox) {
+    avatarBox.classList.remove('boss-avatar-shake');
+    void avatarBox.offsetWidth;
+    avatarBox.classList.add('boss-avatar-shake');
+    setTimeout(() => avatarBox.classList.remove('boss-avatar-shake'), 600);
+  }
+
+  setTimeout(() => {
+    fx.style.display = 'none';
+  }, 900);
+}
+
+// 보스 토벌 승리 모달
+function showStudentBossVictory(data) {
+  const modal = document.getElementById('student-boss-victory-modal');
+  if (!modal) return;
+
+  const iconEl = document.getElementById('sb-vic-icon');
+  const titleEl = document.getElementById('sb-vic-title');
+  const descEl = document.getElementById('sb-vic-desc');
+  const badgeIcon = document.getElementById('sb-vic-badge-icon');
+  const badgeName = document.getElementById('sb-vic-badge-name');
+
+  if (iconEl && data.boss) iconEl.textContent = data.boss.icon || '🐉';
+  if (titleEl && data.boss) titleEl.textContent = `${data.boss.name} 토벌 완료!`;
+  if (descEl) {
+    const mvpText = data.mvp ? `시즌 MVP: <b>${data.mvp.name}</b> (${data.mvp.damage} DMG)` : '';
+    descEl.innerHTML = `모든 친구들이 힘을 합쳐 거대 보스를 격퇴했습니다!<br>${mvpText}`;
+  }
+  if (data.rewardBadge) {
+    if (badgeIcon) badgeIcon.textContent = data.rewardBadge.icon;
+    if (badgeName) badgeName.textContent = data.rewardBadge.name;
+
+    // 내 프로필에 뱃지 추가
+    if (!myProfile.badges) myProfile.badges = [];
+    if (!myProfile.badges.some(b => b.id === data.rewardBadge.id)) {
+      myProfile.badges.push(data.rewardBadge);
+      renderBadgePouch();
+    }
+  }
+
+  modal.style.display = 'flex';
+  fireConfetti();
+  window.soundManager.playBossVictory();
+}

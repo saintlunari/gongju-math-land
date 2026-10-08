@@ -53,6 +53,46 @@
           <button id="teacher-zoom-reset" class="pad-btn" title="전체 보기 (150곳 꽉 채우기)">🧭</button>
           <button id="teacher-zoom-wide" class="pad-btn" title="지도 극대화 토글">⛶</button>
         </div>
+
+        <!-- 전자칠판용 거대 보스 레이드 실시간 전광판 (보스 출현 시 상단 노출) -->
+        <div id="teacher-boss-overlay" class="teacher-boss-hud" style="display: none;">
+          <div class="tb-boss-badge">
+            <span class="tb-boss-icon" id="tb-boss-icon">🐉</span>
+            <div class="tb-boss-meta">
+              <div class="tb-boss-title-row">
+                <span class="tb-boss-tag">⚠️ 시즌 거대 보스 출현! (PVE 협동전)</span>
+                <span class="tb-boss-location" id="tb-boss-location">금강 본류</span>
+              </div>
+              <h2 class="tb-boss-name" id="tb-boss-name">금강의 수호신 '금강대룡'</h2>
+            </div>
+            <div class="tb-boss-status-box">
+              <span id="tb-boss-status-text">격전 중!</span>
+            </div>
+          </div>
+
+          <!-- 대형 보스 체력바 -->
+          <div class="tb-hp-wrapper">
+            <div class="tb-hp-track">
+              <div class="tb-hp-fill" id="tb-hp-bar" style="width: 100%;"></div>
+            </div>
+            <div class="tb-hp-text-row">
+              <span class="tb-hp-nums" id="tb-hp-nums">300 / 300 HP</span>
+              <span class="tb-hp-pct" id="tb-hp-pct">100%</span>
+            </div>
+          </div>
+
+          <!-- 실시간 공격 피드 & 데미지 MVP -->
+          <div class="tb-combat-feed-row">
+            <div class="tb-hit-ticker" id="tb-hit-ticker">
+              <span class="tb-ticker-icon">💥</span>
+              <span class="tb-ticker-text" id="tb-ticker-text">모든 학생이 힘을 합쳐 곱셈 문제를 맞히면 보스 체력이 깎입니다!</span>
+            </div>
+            <div class="tb-mvp-badge" id="tb-mvp-badge">
+              <span>👑 기여도 1위: <b id="tb-mvp-name">대기 중</b> (<span id="tb-mvp-dmg">0</span> DMG)</span>
+            </div>
+          </div>
+        </div>
+
         <div id="teacher-map-container"></div>
 
         <!-- 영토 클릭 시 팝아웃 상세 정보 카드 (교사용) -->
@@ -166,6 +206,46 @@
         <button id="btn-reset-regions" class="btn-action-full" style="margin-top: 12px;">🧹 현재 영토만 초기화 (점수 유지)</button>
       </div>
 
+      <!-- 시즌 보스 거대 몬스터 토벌전 제어 카드 -->
+      <div class="side-card" style="border: 2px solid #EC4899; background: linear-gradient(180deg, #1E1B4B 0%, #0F172A 100%);">
+        <div class="panel-title" style="color: #F472B6; display: flex; justify-content: space-between; align-items: center;">
+          <span>🐉 거대 보스 토벌전 (PVE 협동)</span>
+          <span id="teacher-boss-state-badge" style="font-size: 0.72rem; background: #334155; color: #94A3B8; padding: 2px 7px; border-radius: 8px;">대기 중</span>
+        </div>
+
+        <div style="font-size: 0.8rem; color: #CBD5E1; margin: 6px 0 10px 0; line-height: 1.4;">
+          학급 전체가 힘을 모아 공주시 거대 보스를 물리치는 실시간 협동 레이드입니다!
+        </div>
+
+        <div style="margin-bottom: 8px;">
+          <label style="font-size: 0.8rem; color: #94A3B8; display: block; margin-bottom: 3px;">시즌 보스 선택</label>
+          <select id="teacher-boss-select" class="select-control" style="font-size: 0.85rem; font-weight: bold; background: #0F172A; border-color: #EC4899;">
+            <option value="boss_dragon">🐉 금강의 수호신 '금강대룡' (금강)</option>
+            <option value="boss_goblin" selected>🌰👹 정안 숲의 '대왕 알밤 도깨비' (정안면)</option>
+            <option value="boss_golem">🗿⚡ 계룡산 삼불봉 '바위 골렘' (계룡면)</option>
+            <option value="boss_phoenix">🦅🔥 공산성 수호 '황금 불사조' (중학동)</option>
+          </select>
+        </div>
+
+        <div style="margin-bottom: 12px;">
+          <label style="font-size: 0.8rem; color: #94A3B8; display: block; margin-bottom: 3px;">보스 체력 (HP 난이도)</label>
+          <select id="teacher-boss-hp" class="select-control" style="font-size: 0.85rem; background: #0F172A;">
+            <option value="150">150 HP (쉬움 / 10명 내외 속도전)</option>
+            <option value="300" selected>300 HP (보통 / 20~25명 일반 차시)</option>
+            <option value="500">500 HP (도전 / 집중 토벌 대결)</option>
+          </select>
+        </div>
+
+        <div style="display: flex; gap: 8px;">
+          <button id="btn-summon-boss" class="btn-ctrl" style="flex: 2; background: linear-gradient(135deg, #EC4899, #BE185D); color: white; font-weight: 800; font-size: 0.9rem; padding: 10px; border-radius: 10px; border: none; cursor: pointer; box-shadow: 0 4px 12px rgba(236, 72, 153, 0.4);">
+            🐉 토벌전 소환 / 시작!
+          </button>
+          <button id="btn-dismiss-boss" class="btn-ctrl" style="flex: 1; background: #334155; color: #94A3B8; font-size: 0.8rem; border-radius: 10px; border: 1px solid #475569; cursor: pointer;">
+            중지
+          </button>
+        </div>
+      </div>
+
     </aside>
 
   </main>
@@ -180,6 +260,36 @@
       <div id="hof-list-container" style="overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 12px; padding-right: 4px;">
         <!-- 시즌별 우승 카드 동적 렌더링 -->
       </div>
+    </div>
+  </div>
+
+  <!-- 보스 토벌 성공 대형 시상 모달 (교사용 전자칠판) -->
+  <div class="modal-overlay" id="teacher-boss-victory-modal" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.92); z-index: 3000; align-items: center; justify-content: center;">
+    <div class="modal-card" style="text-align: center; max-width: 580px; width: 92%; background: linear-gradient(180deg, #1E1B4B 0%, #0F172A 100%); border: 4px solid #F59E0B; border-radius: 28px; padding: 32px; box-shadow: 0 25px 60px rgba(245, 158, 11, 0.4);">
+      <div id="tb-vic-icon" style="font-size: 5rem; margin-bottom: 4px; filter: drop-shadow(0 0 20px #F59E0B);">👑</div>
+      <h1 style="color: #FCD34D; font-size: 2.2rem; font-weight: 900; margin-bottom: 6px;">공주시 수호 대성공!</h1>
+      <div id="tb-vic-boss-title" style="color: #94A3B8; font-size: 1.1rem; margin-bottom: 18px;">정안 숲의 '대왕 알밤 도깨비' 토벌 완료!</div>
+      
+      <div style="background: rgba(255, 255, 255, 0.08); border-radius: 16px; padding: 18px; margin-bottom: 20px; display: flex; flex-direction: column; gap: 10px;">
+        <div style="display: flex; justify-content: space-around; align-items: center;">
+          <div>
+            <div style="font-size: 0.85rem; color: #94A3B8;">🎖️ 토벌 MVP 학생</div>
+            <div id="tb-vic-mvp-student" style="font-size: 1.35rem; font-weight: 900; color: #38BDF8; margin-top: 4px;">김민준 학생</div>
+          </div>
+          <div style="width: 1px; height: 36px; background: rgba(255,255,255,0.2);"></div>
+          <div>
+            <div style="font-size: 0.85rem; color: #94A3B8;">🏫 최다 기여 학급</div>
+            <div id="tb-vic-mvp-team" style="font-size: 1.35rem; font-weight: 900; color: #F59E0B; margin-top: 4px;">2학년 1반</div>
+          </div>
+        </div>
+        <div id="tb-vic-reward-badge" style="background: rgba(245, 158, 11, 0.15); border: 1.5px solid #F59E0B; border-radius: 10px; padding: 10px; color: #FEF3C7; font-size: 0.95rem;">
+          🎁 전원 보상: <b>[🌰👹 알밤 도깨비 퇴치단]</b> 한정 뱃지 & +100점 지급 완료!
+        </div>
+      </div>
+
+      <button class="btn-primary" id="btn-close-teacher-boss-vic" style="background: linear-gradient(135deg, #F59E0B, #D97706); font-size: 1.1rem; padding: 14px 28px; width: 100%;">
+        멋진 승리를 축하하며 닫기! 🌟
+      </button>
     </div>
   </div>
 

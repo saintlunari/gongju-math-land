@@ -1371,3 +1371,413 @@ body {
   background: #B91C1C;
   transform: translateY(-2px);
 }
+
+/* =========================================================
+   시즌 보스 거대 몬스터 토벌전 (PVE 협동 모드) 스타일
+   ========================================================= */
+
+/* 1. 상단 보스 출현 알림 배너 */
+.student-boss-banner {
+  background: linear-gradient(135deg, #4C1D95 0%, #BE185D 50%, #B45309 100%);
+  border: 2.5px solid #F472B6;
+  border-radius: 18px;
+  padding: 10px 16px;
+  margin: 6px 12px 10px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: white;
+  box-shadow: 0 6px 20px rgba(190, 24, 93, 0.4);
+  animation: bossBannerPulse 2.5s infinite alternate ease-in-out;
+}
+
+@keyframes bossBannerPulse {
+  0% { box-shadow: 0 4px 14px rgba(190, 24, 93, 0.35); }
+  100% { box-shadow: 0 8px 26px rgba(244, 114, 182, 0.65); transform: translateY(-1px); }
+}
+
+.sbb-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sbb-flame {
+  font-size: 1.5rem;
+  animation: flameFlicker 0.8s infinite alternate;
+}
+
+@keyframes flameFlicker {
+  0% { transform: scale(1); }
+  100% { transform: scale(1.25) rotate(5deg); }
+}
+
+.sbb-icon {
+  font-size: 2.2rem;
+  filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.6));
+}
+
+.sbb-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.sbb-tag {
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #FBCFE8;
+  letter-spacing: 0.3px;
+}
+
+.sbb-title {
+  font-size: 1.1rem;
+  font-weight: 900;
+  color: #FFFFFF;
+}
+
+.sbb-center {
+  flex: 1;
+  max-width: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sbb-hp-bar-track {
+  height: 12px;
+  background: rgba(15, 23, 42, 0.6);
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  overflow: hidden;
+}
+
+.sbb-hp-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #EF4444, #F59E0B);
+  border-radius: 6px;
+  transition: width 0.3s ease;
+}
+
+.sbb-hp-text {
+  font-size: 0.75rem;
+  font-weight: bold;
+  color: #FEF08A;
+  text-align: right;
+}
+
+.btn-enter-boss {
+  background: linear-gradient(135deg, #F59E0B, #EA580C);
+  color: white;
+  border: 2px solid #FEF3C7;
+  border-radius: 12px;
+  padding: 8px 16px;
+  font-size: 0.95rem;
+  font-weight: 900;
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(234, 88, 12, 0.45);
+  transition: transform 0.15s ease;
+}
+
+.btn-enter-boss:hover {
+  transform: scale(1.05);
+}
+
+/* 2. 보스 레이드 모달 본체 */
+.boss-raid-card {
+  background: linear-gradient(180deg, #1E1B4B 0%, #0F172A 100%);
+  border: 3px solid #EC4899;
+  border-radius: 24px;
+  padding: 20px;
+  color: white;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.6), 0 0 30px rgba(236, 72, 153, 0.3);
+}
+
+.boss-card-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1.5px solid rgba(255, 255, 255, 0.1);
+  margin-bottom: 12px;
+}
+
+.boss-avatar-wrapper {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #831843 0%, #4C0519 100%);
+  border: 3px solid #F472B6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 16px rgba(244, 114, 182, 0.5);
+  flex-shrink: 0;
+}
+
+.boss-avatar-emoji {
+  font-size: 3.2rem;
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.5));
+}
+
+.boss-avatar-shake {
+  animation: bossAvatarShakeAnim 0.5s ease-in-out;
+}
+
+@keyframes bossAvatarShakeAnim {
+  0%, 100% { transform: scale(1) rotate(0deg); }
+  20% { transform: scale(1.15) rotate(-6deg); }
+  40% { transform: scale(0.9) rotate(6deg); }
+  60% { transform: scale(1.1) rotate(-4deg); }
+  80% { transform: scale(1) rotate(2deg); }
+}
+
+.boss-header-info {
+  flex: 1;
+}
+
+.boss-tag-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  color: #F472B6;
+  font-weight: 800;
+}
+
+.boss-loc-text {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 1px 6px;
+  border-radius: 6px;
+  color: #CBD5E1;
+}
+
+.boss-name-title {
+  font-size: 1.35rem;
+  font-weight: 900;
+  color: #FFFFFF;
+  margin: 3px 0 6px 0;
+}
+
+.boss-hp-bar-box {
+  width: 100%;
+}
+
+.boss-hp-track {
+  height: 16px;
+  background: #0F172A;
+  border: 1.5px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.boss-hp-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #DC2626 0%, #EA580C 50%, #F59E0B 100%);
+  border-radius: 8px;
+  transition: width 0.25s ease;
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.6);
+}
+
+.boss-hp-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  margin-top: 3px;
+  font-weight: bold;
+  color: #CBD5E1;
+}
+
+/* 내 기여도 바 */
+.boss-my-stats-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+}
+
+.boss-stat-pill {
+  font-size: 0.82rem;
+  color: #CBD5E1;
+}
+
+.bsp-val {
+  color: #FCD34D;
+  font-weight: 900;
+  margin-left: 2px;
+}
+
+.boss-item-btn {
+  background: #334155;
+  border: 1px solid #475569;
+  color: white;
+  border-radius: 8px;
+  padding: 4px 10px;
+  font-size: 0.78rem;
+  font-weight: bold;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.boss-item-count {
+  background: #EC4899;
+  color: white;
+  border-radius: 10px;
+  padding: 1px 6px;
+  font-size: 0.72rem;
+}
+
+/* 공격 퀴즈 박스 */
+.boss-quiz-box {
+  background: rgba(15, 23, 42, 0.8);
+  border: 2px solid #334155;
+  border-radius: 16px;
+  padding: 14px;
+  text-align: center;
+}
+
+.boss-quiz-concept {
+  display: inline-block;
+  background: #4C1D95;
+  color: #DDD6FE;
+  font-size: 0.78rem;
+  font-weight: 800;
+  padding: 3px 10px;
+  border-radius: 12px;
+  margin-bottom: 6px;
+}
+
+.boss-quiz-formula {
+  font-size: 2.2rem;
+  font-weight: 900;
+  color: #FCD34D;
+  letter-spacing: 2px;
+  margin: 4px 0;
+}
+
+.boss-quiz-visual {
+  font-size: 1.15rem;
+  color: #86EFAC;
+  margin-bottom: 6px;
+}
+
+.boss-quiz-subtitle {
+  font-size: 0.82rem;
+  color: #94A3B8;
+  margin-bottom: 12px;
+}
+
+.boss-multiple-grid {
+  gap: 10px;
+}
+
+.boss-opt-btn {
+  background: #1E293B;
+  border: 2.5px solid #3B82F6;
+  color: #FFFFFF;
+  font-size: 1.6rem;
+  font-weight: 900;
+  border-radius: 14px;
+  padding: 14px;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25);
+  transition: all 0.15s ease;
+}
+
+.boss-opt-btn:hover {
+  background: #2563EB;
+  border-color: #60A5FA;
+  transform: translateY(-2px);
+}
+
+.boss-opt-btn:active {
+  transform: scale(0.96);
+}
+
+.boss-action-footer {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.boss-mode-btn {
+  flex: 1;
+  background: #1E293B;
+  border: 1px solid #475569;
+  color: #94A3B8;
+  padding: 8px;
+  border-radius: 10px;
+  font-size: 0.78rem;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.boss-mode-btn.active {
+  background: #2563EB;
+  color: white;
+  border-color: #3B82F6;
+}
+
+.boss-btn-retreat {
+  background: none;
+  border: 1px solid #EF4444;
+  color: #EF4444;
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 0.78rem;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.boss-btn-retreat:hover {
+  background: rgba(239, 68, 68, 0.15);
+}
+
+/* 타격 이펙트 팝업 */
+.boss-hit-fx {
+  position: absolute;
+  top: 35%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 2500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.boss-hit-text {
+  font-size: 2.2rem;
+  font-weight: 900;
+  color: #FCD34D;
+  text-shadow: 0 0 16px rgba(245, 158, 11, 0.8), 2px 2px 0 #78350F;
+  animation: hitFloatAnim 0.8s ease-out forwards;
+}
+
+.boss-hit-text.crit-hit {
+  font-size: 2.8rem;
+  color: #FF5252;
+  text-shadow: 0 0 20px rgba(255, 82, 82, 0.9), 3px 3px 0 #7F1D1D;
+  animation: critHitFloatAnim 0.9s ease-out forwards;
+}
+
+@keyframes hitFloatAnim {
+  0% { transform: translateY(0) scale(0.6); opacity: 0; }
+  30% { transform: translateY(-15px) scale(1.2); opacity: 1; }
+  100% { transform: translateY(-40px) scale(1); opacity: 0; }
+}
+
+@keyframes critHitFloatAnim {
+  0% { transform: translateY(0) scale(0.5); opacity: 0; }
+  25% { transform: translateY(-20px) scale(1.35) rotate(-5deg); opacity: 1; }
+  100% { transform: translateY(-55px) scale(1.1) rotate(5deg); opacity: 0; }
+}

@@ -701,3 +701,155 @@ body {
   font-size: 0.75rem;
   margin: 2px;
 }
+
+/* =========================================================
+   교사용 전자칠판 거대 보스 레이드 실시간 전광판 (HUD)
+   ========================================================= */
+
+.teacher-boss-hud {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  right: 14px;
+  background: rgba(15, 23, 42, 0.94);
+  border: 3px solid #EC4899;
+  border-radius: 20px;
+  padding: 12px 18px;
+  z-index: 100;
+  box-shadow: 0 8px 30px rgba(236, 72, 153, 0.45);
+  backdrop-filter: blur(8px);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  animation: bossHudGlow 2s infinite alternate ease-in-out;
+}
+
+@keyframes bossHudGlow {
+  0% { box-shadow: 0 6px 20px rgba(236, 72, 153, 0.35); }
+  100% { box-shadow: 0 10px 36px rgba(244, 114, 182, 0.65); }
+}
+
+.teacher-boss-hud.boss-shake {
+  animation: bossHudShake 0.5s ease-in-out;
+}
+
+@keyframes bossHudShake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-6px) rotate(-0.5deg); }
+  40%, 80% { transform: translateX(6px) rotate(0.5deg); }
+}
+
+.tb-boss-badge {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.tb-boss-icon {
+  font-size: 2.8rem;
+  filter: drop-shadow(0 0 10px rgba(244, 114, 182, 0.6));
+}
+
+.tb-boss-meta {
+  flex: 1;
+}
+
+.tb-boss-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tb-boss-tag {
+  background: #BE185D;
+  color: #FDF2F8;
+  padding: 2px 8px;
+  border-radius: 8px;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.tb-boss-location {
+  color: #94A3B8;
+  font-size: 0.8rem;
+}
+
+.tb-boss-name {
+  font-size: 1.45rem;
+  color: #FFFFFF;
+  font-weight: 900;
+  margin-top: 2px;
+}
+
+.tb-boss-status-box {
+  background: rgba(236, 72, 153, 0.2);
+  border: 1.5px solid #EC4899;
+  border-radius: 10px;
+  padding: 6px 14px;
+  color: #F472B6;
+  font-weight: 900;
+  font-size: 0.95rem;
+}
+
+.tb-hp-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tb-hp-track {
+  height: 20px;
+  background: #0F172A;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: inset 0 2px 6px rgba(0,0,0,0.5);
+}
+
+.tb-hp-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #DC2626 0%, #EA580C 50%, #F59E0B 100%);
+  border-radius: 10px;
+  transition: width 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  box-shadow: 0 0 14px rgba(239, 68, 68, 0.8);
+}
+
+.tb-hp-text-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.9rem;
+  font-weight: bold;
+}
+
+.tb-hp-nums {
+  color: #E2E8F0;
+}
+
+.tb-hp-pct {
+  color: #F472B6;
+  font-weight: 900;
+  font-size: 1.05rem;
+}
+
+.tb-combat-feed-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 10px;
+  padding: 6px 12px;
+  font-size: 0.85rem;
+}
+
+.tb-hit-ticker {
+  color: #FCD34D;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+}
+
+.tb-mvp-badge {
+  color: #38BDF8;
+  font-weight: 800;
+}

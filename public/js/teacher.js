@@ -142,11 +142,77 @@ function initSocket() {
     if (data.season) {
       updateSeasonDisplay(data.season);
     }
+
+    // 시즌 보스 정보 초기 렌더링
+    if (data.boss) {
+      updateBossHUD(data.boss);
+    }
   });
 
-  // 시즌 실시간 틱 동기화
+  // 시즌 실시간 틱 동기화 (보스 정보 포함)
   socket.on('season_tick', (seasonInfo) => {
     updateSeasonDisplay(seasonInfo);
+    if (seasonInfo.boss) {
+      updateBossHUD(seasonInfo.boss);
+    }
+  });
+
+  // [시즌 보스 레이드] 보스 소환 이벤트 수신
+  socket.on('boss_summoned', (data) => {
+    updateBossHUD(data.boss);
+    window.soundManager.playBossRoar();
+    addBattleLog(`⚠️ [긴급 출동] 공주시에 거대 시즌 보스 [${data.boss.icon} ${data.boss.name}] 출현! (HP: ${data.boss.maxHp})`);
+  });
+
+  // [시즌 보스 레이드] 보스 타격 피격 수신
+  socket.on('boss_hit', (data) => {
+    const overlay = document.getElementById('teacher-boss-overlay');
+    const bar = document.getElementById('tb-hp-bar');
+    const nums = document.getElementById('tb-hp-nums');
+    const pct = document.getElementById('tb-hp-pct');
+    const tickerText = document.getElementById('tb-ticker-text');
+
+    if (bar) bar.style.width = `${data.hpPercent}%`;
+    if (nums) nums.textContent = `${data.currentHp} / ${data.maxHp} HP`;
+    if (pct) pct.textContent = `${data.hpPercent}%`;
+
+    const critText = data.isCrit ? ' 🔥 [크리티컬!]' : '';
+    if (tickerText) {
+      tickerText.innerHTML = `💥 <b>[${data.studentName}]</b> 학생의 곱셈 공격! <b>-${data.damage} HP</b>${critText}`;
+    }
+
+    // 보스 HUD 타격 흔들림 연출
+    if (overlay) {
+      overlay.classList.remove('boss-shake');
+      void overlay.offsetWidth;
+      overlay.classList.add('boss-shake');
+      setTimeout(() => overlay.classList.remove('boss-shake'), 600);
+    }
+
+    window.soundManager.playBossHit(data.isCrit);
+
+    // MVP 표시 갱신
+    if (data.topContributors && data.topContributors.length > 0) {
+      const top = data.topContributors[0];
+      const mvpNameEl = document.getElementById('tb-mvp-name');
+      const mvpDmgEl = document.getElementById('tb-mvp-dmg');
+      if (mvpNameEl) mvpNameEl.textContent = top.name;
+      if (mvpDmgEl) mvpDmgEl.textContent = top.damage;
+    }
+  });
+
+  // [시즌 보스 레이드] 보스 토벌 성공 수신
+  socket.on('boss_defeated', (data) => {
+    updateBossHUD(data.boss);
+    window.soundManager.playBossVictory();
+    showBossDefeatedVictory(data);
+    addBattleLog(`🎉 [토벌 대성공] ${data.text}`);
+  });
+
+  // [시즌 보스 레이드] 보스 중지 수신
+  socket.on('boss_dismissed', (data) => {
+    updateBossHUD(data.boss);
+    addBattleLog('🛡️ 교사 권한으로 보스 토벌전이 일시 종료되었습니다.');
   });
 
   // 시즌 종료 & 새 시즌 자동/수동 리셋
@@ -467,6 +533,38 @@ function initControls() {
 
   toggleWideBtn?.addEventListener('click', handleToggleWide);
   zoomWideBtn?.addEventListener('click', handleToggleWide);
+
+  // [시즌 보스 레이드] 보스 소환 버튼
+  document.getElementById('btn-summon-boss')?.addEventListener('click', () => {
+    const bossSelect = document.getElementById('teacher-boss-select');
+    const hpSelect = document.getElementById('teacher-boss-hp');
+    const bossTemplateId = bossSelect ? bossSelect.value : null;
+    const maxHp = hpSelect ? parseInt(hpSelect.value, 10) : 300;
+
+    const bossName = bossSelect ? bossSelect.options[bossSelect.selectedIndex]?.text : '시즌 보스';
+    if (confirm(`🐉 [시즌 보스 토벌전 출격]\n\n${bossName} (HP: ${maxHp})\n\n학급 전체가 실시간으로 협동하여 보스를 물리치는 레이드를 시작하시겠습니까?`)) {
+      window.soundManager.playClick();
+      socket.emit('teacher_control', {
+        action: 'summon_boss',
+        payload: { bossTemplateId, maxHp }
+      });
+    }
+  });
+
+  // [시즌 보스 레이드] 보스 토벌 중지 버튼
+  document.getElementById('btn-dismiss-boss')?.addEventListener('click', () => {
+    if (confirm('보스 토벌전을 중지하시겠습니까?')) {
+      window.soundManager.playClick();
+      socket.emit('teacher_control', { action: 'dismiss_boss' });
+    }
+  });
+
+  // [시즌 보스 레이드] 승리 모달 닫기
+  document.getElementById('btn-close-teacher-boss-vic')?.addEventListener('click', () => {
+    window.soundManager.playClick();
+    const modal = document.getElementById('teacher-boss-victory-modal');
+    if (modal) modal.style.display = 'none';
+  });
 }
 
 // 주간 시즌 뱃지 및 D-Day 타이머 갱신
@@ -530,6 +628,89 @@ function renderHallOfFame(hallOfFame) {
         </div>
       `;
     }).join('');
+  }
+
+  modal.style.display = 'flex';
+}
+
+// [시즌 보스 레이드] 교사 화면 보스 HUD 상태 갱신
+function updateBossHUD(boss) {
+  if (!boss) return;
+  const overlay = document.getElementById('teacher-boss-overlay');
+  const badgeState = document.getElementById('teacher-boss-state-badge');
+  if (!overlay) return;
+
+  const isRaging = (boss.status === 'raging');
+  overlay.style.display = isRaging ? 'flex' : 'none';
+
+  if (badgeState) {
+    if (isRaging) {
+      badgeState.textContent = '🔥 토벌전 진행 중!';
+      badgeState.style.background = '#EC4899';
+      badgeState.style.color = '#FFFFFF';
+    } else if (boss.isDefeated) {
+      badgeState.textContent = '👑 토벌 완료';
+      badgeState.style.background = '#10B981';
+      badgeState.style.color = '#FFFFFF';
+    } else {
+      badgeState.textContent = '대기 중';
+      badgeState.style.background = '#334155';
+      badgeState.style.color = '#94A3B8';
+    }
+  }
+
+  // 엘리먼트 데이터 채우기
+  const iconEl = document.getElementById('tb-boss-icon');
+  const nameEl = document.getElementById('tb-boss-name');
+  const locEl = document.getElementById('tb-boss-location');
+  const barEl = document.getElementById('tb-hp-bar');
+  const numsEl = document.getElementById('tb-hp-nums');
+  const pctEl = document.getElementById('tb-hp-pct');
+  const statusEl = document.getElementById('tb-boss-status-text');
+
+  if (iconEl) iconEl.textContent = boss.icon || '🐉';
+  if (nameEl) nameEl.textContent = boss.name || '시즌 보스';
+  if (locEl) locEl.textContent = boss.location || '공주시';
+  if (barEl) barEl.style.width = `${boss.hpPercent || 0}%`;
+  if (numsEl) numsEl.textContent = `${boss.currentHp || 0} / ${boss.maxHp || 0} HP`;
+  if (pctEl) pctEl.textContent = `${boss.hpPercent || 0}%`;
+  if (statusEl) statusEl.textContent = isRaging ? '⚔️ 격전 중!' : (boss.isDefeated ? '👑 토벌 완료' : '대기');
+
+  // MVP 정보
+  if (boss.topContributors && boss.topContributors.length > 0) {
+    const top = boss.topContributors[0];
+    const mvpNameEl = document.getElementById('tb-mvp-name');
+    const mvpDmgEl = document.getElementById('tb-mvp-dmg');
+    if (mvpNameEl) mvpNameEl.textContent = top.name;
+    if (mvpDmgEl) mvpDmgEl.textContent = top.damage;
+  }
+}
+
+// [시즌 보스 레이드] 보스 토벌 성공 대형 시상 모달
+function showBossDefeatedVictory(data) {
+  const modal = document.getElementById('teacher-boss-victory-modal');
+  if (!modal) return;
+
+  const iconEl = document.getElementById('tb-vic-icon');
+  const titleEl = document.getElementById('tb-vic-boss-title');
+  const mvpStudentEl = document.getElementById('tb-vic-mvp-student');
+  const mvpTeamEl = document.getElementById('tb-vic-mvp-team');
+  const rewardBadgeEl = document.getElementById('tb-vic-reward-badge');
+
+  if (iconEl) iconEl.textContent = data.boss ? data.boss.icon : '👑';
+  if (titleEl) titleEl.textContent = `${data.boss ? data.boss.name : '시즌 보스'} 토벌 완료!`;
+
+  if (mvpStudentEl) {
+    mvpStudentEl.textContent = data.mvp ? `${data.mvp.name} 학생 (${data.mvp.damage} DMG)` : '공주시 전체 학생';
+  }
+
+  if (mvpTeamEl) {
+    const teamNames = { team_1: '2학년 1반', team_2: '2학년 2반', team_3: '2학년 3반', team_4: '2학년 4반' };
+    mvpTeamEl.textContent = data.winningTeamId ? teamNames[data.winningTeamId] || data.winningTeamId : '전체 학급';
+  }
+
+  if (rewardBadgeEl && data.rewardBadge) {
+    rewardBadgeEl.innerHTML = `🎁 전원 보상: <b>[${data.rewardBadge.icon} ${data.rewardBadge.name}]</b> 한정 뱃지 & +${data.rewardScore || 100}점 지급 완료!`;
   }
 
   modal.style.display = 'flex';

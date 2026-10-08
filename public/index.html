@@ -110,6 +110,27 @@
     </div>
   </section>
 
+  <!-- 시즌 보스 출현 알림 배너 (보스 레이드 활성화 시 표시) -->
+  <div id="student-boss-banner" class="student-boss-banner" style="display: none;">
+    <div class="sbb-left">
+      <span class="sbb-flame">🔥</span>
+      <span class="sbb-icon" id="sbb-icon">🐉</span>
+      <div class="sbb-info">
+        <div class="sbb-tag">⚠️ 시즌 거대 보스 출현! [PVE 전원 협동 레이드]</div>
+        <div class="sbb-title" id="sbb-title">금강의 수호신 '금강대룡'</div>
+      </div>
+    </div>
+    <div class="sbb-center">
+      <div class="sbb-hp-bar-track">
+        <div class="sbb-hp-bar-fill" id="sbb-hp-fill" style="width: 100%;"></div>
+      </div>
+      <span class="sbb-hp-text" id="sbb-hp-text">300 / 300 HP</span>
+    </div>
+    <button id="btn-enter-boss-raid" class="btn-enter-boss">
+      ⚔️ 지금 참전하기!
+    </button>
+  </div>
+
   <!-- 실시간 속보 티커 -->
   <div class="news-ticker" id="news-ticker">
     공주시 지도를 터치해서 곱셈 문제를 풀고 내 땅을 차지해보세요! 🚀
@@ -360,6 +381,124 @@
         <span id="lockout-modal-timer">60초 남음 (빨간색 표시)</span>
       </div>
       <button class="btn-lockout-confirm" id="btn-close-lockout-modal">알겠습니다! 다른 땅 풀기 🚀</button>
+    </div>
+  </div>
+
+  <!-- =======================================================
+       7. 시즌 보스 거대 몬스터 실시간 협동 레이드 모달
+       ======================================================= -->
+  <div class="modal-overlay" id="boss-raid-modal" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.92); z-index: 2200; align-items: center; justify-content: center;">
+    <div class="modal-card boss-raid-card" style="position: relative; max-width: 520px; width: 94%; max-height: 90vh; overflow-y: auto;">
+      
+      <!-- 보스 피격 / 공격 이펙트 오버레이 -->
+      <div class="boss-hit-fx" id="boss-hit-fx" style="display: none;">
+        <span class="boss-hit-text" id="boss-hit-text">💥 -15 HP!</span>
+      </div>
+
+      <!-- 상단 보스 정보 및 체력바 헤더 -->
+      <div class="boss-card-header">
+        <div class="boss-avatar-wrapper" id="boss-avatar-box">
+          <span class="boss-avatar-emoji" id="boss-card-icon">🐉</span>
+        </div>
+        <div class="boss-header-info">
+          <div class="boss-tag-line">
+            <span class="boss-pulse-dot">🔴</span>
+            <span class="boss-tag-text">공주시 시즌 거대 보스</span>
+            <span class="boss-loc-text" id="boss-card-loc">금강 본류</span>
+          </div>
+          <h2 class="boss-name-title" id="boss-card-name">금강의 수호신 '금강대룡'</h2>
+          
+          <!-- 실시간 보스 HP 바 -->
+          <div class="boss-hp-bar-box">
+            <div class="boss-hp-track">
+              <div class="boss-hp-fill" id="boss-card-hp-fill" style="width: 100%;"></div>
+            </div>
+            <div class="boss-hp-meta">
+              <span id="boss-card-hp-text">300 / 300 HP</span>
+              <span id="boss-card-hp-pct" style="color: #F472B6; font-weight: 800;">100%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 내 기여도 & 연속 콤보 HUD -->
+      <div class="boss-my-stats-bar">
+        <div class="boss-stat-pill">
+          <span class="bsp-label">🔥 연속 공격:</span>
+          <span class="bsp-val" id="boss-my-streak">0연타</span>
+        </div>
+        <div class="boss-stat-pill">
+          <span class="bsp-label">⚔️ 내가 준 피해:</span>
+          <span class="bsp-val" id="boss-my-dmg">0 HP</span>
+        </div>
+        <button class="boss-item-btn" id="btn-boss-eraser" title="오답 2개를 지워줍니다!">
+          <span>🪄 오답 지우개</span>
+          <span class="boss-item-count" id="boss-eraser-count">1</span>
+        </button>
+      </div>
+
+      <!-- 공격 퀴즈 박스 -->
+      <div class="boss-quiz-box">
+        <div class="boss-quiz-concept" id="boss-quiz-concept">🦘 몇씩 뛰어 세기</div>
+        <div class="boss-quiz-formula" id="boss-quiz-formula">6 × 7 = ?</div>
+        <div class="boss-quiz-visual" id="boss-quiz-visual" style="display: none;">🌰🌰 ➔ 🌰🌰</div>
+        <div class="boss-quiz-subtitle" id="boss-quiz-subtitle">정답을 맞혀 보스에게 강력한 곱셈 타격을 입히세요!</div>
+
+        <!-- 내 입력 숫자 표시 (키패드 모드용) -->
+        <div class="quiz-answer-display" id="boss-user-input" style="display: none;">?</div>
+
+        <!-- 4지선다 보기 그리드 -->
+        <div class="multiple-grid boss-multiple-grid" id="boss-multiple-options"></div>
+
+        <!-- 숫자 키패드 모드 그리드 -->
+        <div id="boss-keypad-container" style="display: none; margin-top: 8px;">
+          <div class="keypad-grid">
+            <button class="key-btn" data-val="1">1</button>
+            <button class="key-btn" data-val="2">2</button>
+            <button class="key-btn" data-val="3">3</button>
+            <button class="key-btn" data-val="4">4</button>
+            <button class="key-btn" data-val="5">5</button>
+            <button class="key-btn" data-val="6">6</button>
+            <button class="key-btn" data-val="7">7</button>
+            <button class="key-btn" data-val="8">8</button>
+            <button class="key-btn" data-val="9">9</button>
+            <button class="key-btn action-clear" data-val="clear">지움 ⌫</button>
+            <button class="key-btn" data-val="0">0</button>
+            <button class="key-btn action-submit" data-val="submit">공격 발사! 💥</button>
+          </div>
+        </div>
+
+        <!-- 입력 방식 전환 토글 및 후퇴 버튼 -->
+        <div class="boss-action-footer">
+          <button class="boss-mode-btn active" id="btn-boss-mode-mul">선택형(4지선다)</button>
+          <button class="boss-mode-btn" id="btn-boss-mode-pad">숫자 패드 직접 입력</button>
+          <button class="boss-btn-retreat" id="btn-close-boss-modal">후퇴하고 지도 보기 ✕</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- =======================================================
+       8. 학생용 시즌 보스 토벌 성공 축하 모달
+       ======================================================= -->
+  <div class="modal-overlay" id="student-boss-victory-modal" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.92); z-index: 2800; align-items: center; justify-content: center;">
+    <div class="modal-card" style="text-align: center; max-width: 440px; width: 92%; background: white; border: 4px solid #F59E0B; border-radius: 26px; padding: 28px; box-shadow: 0 25px 50px rgba(0,0,0,0.4);">
+      <div id="sb-vic-icon" style="font-size: 4.8rem; margin: 6px 0;">🐉</div>
+      <div style="font-size: 0.9rem; color: #D97706; font-weight: 800; letter-spacing: 0.5px;">👑 공주시 전원 협동 레이드 대성공!</div>
+      <h2 id="sb-vic-title" style="font-size: 1.6rem; margin: 10px 0; color: #1E293B;">금강대룡 토벌 완료!</h2>
+      <p id="sb-vic-desc" style="font-size: 0.95rem; color: #475569; margin-bottom: 18px; line-height: 1.5;">
+        모든 친구들이 힘을 모아 공주시를 지켜냈습니다!<br>
+        수호 뱃지와 함께 보너스 점수가 지급되었습니다.
+      </p>
+      <div id="sb-vic-badge-box" style="background: #FEF3C7; border: 2px dashed #F59E0B; border-radius: 14px; padding: 12px; margin-bottom: 20px; display: flex; align-items: center; justify-content: center; gap: 10px;">
+        <span id="sb-vic-badge-icon" style="font-size: 2rem;">🐉</span>
+        <div style="text-align: left;">
+          <div id="sb-vic-badge-name" style="font-weight: 800; color: #B45309; font-size: 1.05rem;">금강룡 토벌 영웅</div>
+          <div style="font-size: 0.8rem; color: #78350F;">특별 명예 뱃지 획득! (+100점)</div>
+        </div>
+      </div>
+      <button class="btn-primary" id="btn-close-student-boss-vic" style="width: 100%;">자랑스럽게 보상 받기! 🌟</button>
     </div>
   </div>
 
