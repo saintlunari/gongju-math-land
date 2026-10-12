@@ -743,6 +743,35 @@ io.on('connection', (socket) => {
         break;
       }
 
+      case 'summon_random_boss': {
+        const { maxHp } = payload || {};
+        const summonedBoss = seasonManager.summonRandomBoss(maxHp);
+        io.emit('boss_summoned', {
+          boss: summonedBoss,
+          templates: SEASON_BOSS_TEMPLATES,
+          isRandom: true
+        });
+        io.emit('broadcast_notice', {
+          type: 'boss_summon',
+          text: `🎲 [랜덤 소환] 거대 보스 [${summonedBoss.icon} ${summonedBoss.name}]이(가) 공주시에 출현했습니다! 즉시 참전하세요!`
+        });
+        break;
+      }
+
+      case 'update_boss_auto_summon_settings': {
+        const updated = seasonManager.setAutoSummonSettings(payload);
+        io.emit('boss_auto_summon_settings_updated', {
+          settings: seasonManager.getAutoSummonSettings(),
+          countdown: seasonManager.getNextAutoSummonCountdown()
+        });
+        const intervalHours = Math.round((updated.intervalSec / 3600) * 10) / 10;
+        io.emit('broadcast_notice', {
+          type: 'settings_change',
+          text: `⚙️ [교사 설정] 보스 자동 소환: ${updated.enabled ? 'ON' : 'OFF'} (주기: ${intervalHours >= 1 ? `${intervalHours}시간` : `${Math.round(updated.intervalSec / 60)}분`}마다)`
+        });
+        break;
+      }
+
       case 'dismiss_boss': {
         const dismissedBoss = seasonManager.dismissBoss();
         io.emit('boss_dismissed', { boss: dismissedBoss });
@@ -860,19 +889,38 @@ io.on('connection', (socket) => {
   });
 });
 
-// 매 1초마다 보스 영토 침식 타이머 틱 동기화 및 자동 침식 실행
+// 매 1초마다 보스 3시간 자동 소환 타이머 검사 및 영토 침식 타이머 틱 동기화
 setInterval(() => {
+  // 1. 보스 3시간 주기 랜덤 자동 소환 검사 및 실행
+  const autoSummonedBoss = seasonManager.tickAutoSummon(gameState);
+  if (autoSummonedBoss) {
+    io.emit('boss_summoned', {
+      boss: autoSummonedBoss,
+      templates: SEASON_BOSS_TEMPLATES,
+      isAuto: true
+    });
+    io.emit('broadcast_notice', {
+      type: 'boss_summon',
+      text: `⚡ [3시간 정기 출현] 공주시에 새로운 거대 보스 [${autoSummonedBoss.icon} ${autoSummonedBoss.name}] 출현! 모든 학생은 지금 바로 협동 토벌전에 참전하세요!`
+    });
+  }
+
   const boss = seasonManager.getBossInfo();
+
+  // 1초 단위로 교사 및 학생 화면에 침식 카운트다운 및 3시간 자동 소환 카운트다운 실시간 동기화
+  io.emit('boss_corruption_tick', {
+    countdown: seasonManager.getCorruptionCountdown(),
+    totalCorrupted: seasonManager.getCorruptedCount(),
+    maxCorrupted: seasonManager.getMaxCorrupted(),
+    settings: seasonManager.getCorruptionSettings(),
+    autoSummonCountdown: seasonManager.getNextAutoSummonCountdown(),
+    autoSummonSettings: seasonManager.getAutoSummonSettings(),
+    nextAutoSummonAt: seasonManager.data.nextAutoSummonAt
+  });
+
+  // 2. 보스가 진행 중일 때 영토 침식 로직 수행
   if (boss && boss.status === 'raging' && !boss.isDefeated) {
     const corruptionResult = seasonManager.tickCorruption(gameState);
-
-    // 1초 단위로 교사 및 학생 화면에 침식 카운트다운 동기화
-    io.emit('boss_corruption_tick', {
-      countdown: seasonManager.getCorruptionCountdown(),
-      totalCorrupted: seasonManager.getCorruptedCount(),
-      maxCorrupted: seasonManager.getMaxCorrupted(),
-      settings: seasonManager.getCorruptionSettings()
-    });
 
     if (corruptionResult) {
       if (corruptionResult.action === 'corrupted') {

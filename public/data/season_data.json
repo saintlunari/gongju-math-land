@@ -162,5 +162,11 @@
     },
     "lastHitLog": [],
     "corruptedTerritories": []
-  }
+  },
+  "autoSummonSettings": {
+    "enabled": true,
+    "intervalSec": 10800,
+    "defaultHp": 10000
+  },
+  "nextAutoSummonAt": "2026-10-12T03:36:01.545Z"
 }

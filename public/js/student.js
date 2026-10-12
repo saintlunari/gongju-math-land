@@ -965,13 +965,18 @@ socket.on('boss_dismissed', (data) => {
   showTicker('🛡️ 보스 토벌전이 일시 종료되었습니다.');
 });
 
-// [보스 영토 침식] 실시간 1초 카운트다운 동기화
+// [보스 영토 침식 및 3시간 자동 소환] 실시간 1초 카운트다운 동기화
 socket.on('boss_corruption_tick', (data) => {
   const countdownEl = document.getElementById('sbb-countdown-text');
-  if (countdownEl && data) {
+  if (countdownEl && data && typeof data.countdown === 'number') {
     const mins = Math.floor(data.countdown / 60);
     const secs = data.countdown % 60;
     countdownEl.textContent = `⏳ 잠식: ${mins}분 ${String(secs).padStart(2, '0')}초`;
+  }
+
+  // 3시간 자동 소환 대기 배너 타이머 실시간 갱신
+  if (data) {
+    updateStudentAutoSummonTimer(data.autoSummonCountdown, data.autoSummonSettings);
   }
 });
 
@@ -1513,10 +1518,11 @@ function updateStudentBossBanner(boss) {
   }
 
   const banner = document.getElementById('student-boss-banner');
-  if (!banner) return;
+  const idleBanner = document.getElementById('student-boss-idle-banner');
 
   const isRaging = (boss.status === 'raging');
-  banner.style.display = isRaging ? 'flex' : 'none';
+  if (banner) banner.style.display = isRaging ? 'flex' : 'none';
+  if (idleBanner) idleBanner.style.display = isRaging ? 'none' : 'flex';
 
   if (isRaging) {
     const iconEl = document.getElementById('sbb-icon');
@@ -1528,7 +1534,26 @@ function updateStudentBossBanner(boss) {
     if (titleEl) titleEl.textContent = boss.name || '시즌 보스';
     if (fillEl) fillEl.style.width = `${boss.hpPercent || 0}%`;
     if (textEl) textEl.textContent = `${boss.currentHp} / ${boss.maxHp} HP (${boss.hpPercent}%)`;
+  } else {
+    updateStudentAutoSummonTimer(boss.nextAutoSummonCountdown, boss.autoSummonSettings);
   }
+}
+
+// 3시간 자동 소환 타이머 UI 포맷 및 갱신
+function updateStudentAutoSummonTimer(countdownSec, settings) {
+  const timerEl = document.getElementById('sbib-timer-text');
+  if (!timerEl) return;
+
+  if (settings && settings.enabled === false) {
+    timerEl.textContent = '⏰ 보스 출현 대기 중';
+    return;
+  }
+
+  const totalSec = (typeof countdownSec === 'number') ? countdownSec : 10800;
+  const hours = Math.floor(totalSec / 3600);
+  const mins = Math.floor((totalSec % 3600) / 60);
+  const secs = totalSec % 60;
+  timerEl.textContent = `⏳ 다음 보스 출현까지: ${String(hours).padStart(2, '0')}시간 ${String(mins).padStart(2, '0')}분 ${String(secs).padStart(2, '0')}초`;
 }
 
 // 보스 모달 상단 정보 갱신

@@ -223,9 +223,15 @@ function initSocket() {
     addBattleLog('🛡️ 교사 권한으로 보스 토벌전이 일시 종료되었습니다.');
   });
 
-  // [보스 영토 침식] 실시간 1초 카운트다운 동기화
+  // [보스 영토 침식 & 3시간 자동 소환] 실시간 1초 카운트다운 동기화
   socket.on('boss_corruption_tick', (data) => {
     updateCorruptionCountdownUI(data);
+    updateAutoSummonCountdownUI(data);
+  });
+
+  // [3시간 자동 소환] 설정 동기화
+  socket.on('boss_auto_summon_settings_updated', (data) => {
+    syncAutoSummonSettingsUI(data.settings, data.countdown);
   });
 
   // [보스 영토 침식] 침식 발생 수신
@@ -630,6 +636,45 @@ function initControls() {
     if (modal) modal.style.display = 'none';
   });
 
+  // [3시간 랜덤 자동 소환] 설정 변경 리스너
+  document.getElementById('teacher-auto-summon-toggle')?.addEventListener('change', (e) => {
+    window.soundManager.playClick();
+    socket.emit('teacher_control', {
+      action: 'update_boss_auto_summon_settings',
+      payload: { enabled: e.target.value === 'true' }
+    });
+  });
+
+  document.getElementById('teacher-auto-summon-interval')?.addEventListener('change', (e) => {
+    window.soundManager.playClick();
+    socket.emit('teacher_control', {
+      action: 'update_boss_auto_summon_settings',
+      payload: { intervalSec: parseInt(e.target.value, 10) }
+    });
+  });
+
+  document.getElementById('teacher-auto-summon-hp')?.addEventListener('change', (e) => {
+    window.soundManager.playClick();
+    socket.emit('teacher_control', {
+      action: 'update_boss_auto_summon_settings',
+      payload: { defaultHp: parseInt(e.target.value, 10) }
+    });
+  });
+
+  // [3시간 랜덤 자동 소환] 지금 즉시 랜덤 보스 소환 버튼
+  document.getElementById('btn-summon-random-now')?.addEventListener('click', () => {
+    const hpSelect = document.getElementById('teacher-auto-summon-hp');
+    const maxHp = hpSelect ? parseInt(hpSelect.value, 10) : 10000;
+
+    if (confirm(`🎲 [랜덤 보스 즉시 출격]\n\n4대 보스 중 무작위 1종을 즉시 소환하시겠습니까? (HP: ${maxHp})\n\n전체 학생 화면에 긴급 레이드 출동 알림이 전송됩니다!`)) {
+      window.soundManager.playClick();
+      socket.emit('teacher_control', {
+        action: 'summon_random_boss',
+        payload: { maxHp }
+      });
+    }
+  });
+
   // [보스 영토 침식] 설정 변경 리스너
   document.getElementById('teacher-corruption-toggle')?.addEventListener('change', (e) => {
     window.soundManager.playClick();
@@ -804,6 +849,16 @@ function updateBossHUD(boss) {
       settings: boss.corruptionSettings
     });
   }
+
+  // 3시간 보스 자동 소환 상태 및 설정 동기화
+  if (boss.autoSummonSettings) {
+    syncAutoSummonSettingsUI(boss.autoSummonSettings, boss.nextAutoSummonCountdown);
+    updateAutoSummonCountdownUI({
+      autoSummonCountdown: boss.nextAutoSummonCountdown,
+      autoSummonSettings: boss.autoSummonSettings,
+      nextAutoSummonAt: boss.nextAutoSummonAt
+    });
+  }
 }
 
 // [시즌 보스 레이드] 보스 토벌 성공 대형 시상 모달
@@ -893,4 +948,66 @@ function triggerInvasionFlash() {
     flash.style.opacity = '0';
     setTimeout(() => flash.remove(), 600);
   }, 100);
+}
+
+// [3시간 랜덤 자동 소환] 실시간 카운트다운 게이지 및 수치 업데이트
+function updateAutoSummonCountdownUI(data) {
+  if (!data) return;
+  const timerText = document.getElementById('teacher-auto-summon-timer-text');
+  const bar = document.getElementById('teacher-auto-summon-bar');
+  const nextTimeEl = document.getElementById('teacher-auto-summon-next-time');
+
+  const countdown = (typeof data.autoSummonCountdown === 'number') ? data.autoSummonCountdown : 10800;
+  const hours = Math.floor(countdown / 3600);
+  const mins = Math.floor((countdown % 3600) / 60);
+  const secs = countdown % 60;
+
+  if (timerText) {
+    if (data.autoSummonSettings && data.autoSummonSettings.enabled === false) {
+      timerText.textContent = '❌ 자동 소환 꺼짐';
+      timerText.style.color = '#94A3B8';
+    } else {
+      timerText.textContent = `${String(hours).padStart(2, '0')}시간 ${String(mins).padStart(2, '0')}분 ${String(secs).padStart(2, '0')}초`;
+      timerText.style.color = '#FCD34D';
+    }
+  }
+
+  const intervalSec = (data.autoSummonSettings && data.autoSummonSettings.intervalSec) ? data.autoSummonSettings.intervalSec : (3 * 3600);
+  const pct = Math.max(0, Math.min(100, Math.round((countdown / intervalSec) * 100)));
+  if (bar) {
+    bar.style.width = `${pct}%`;
+  }
+
+  if (nextTimeEl) {
+    if (data.autoSummonSettings && data.autoSummonSettings.enabled === false) {
+      nextTimeEl.textContent = '상태: 중지됨';
+    } else if (data.nextAutoSummonAt) {
+      try {
+        const d = new Date(data.nextAutoSummonAt);
+        const hStr = String(d.getHours()).padStart(2, '0');
+        const mStr = String(d.getMinutes()).padStart(2, '0');
+        nextTimeEl.textContent = `예정: ${hStr}:${mStr}`;
+      } catch (e) {
+        nextTimeEl.textContent = '예정: 계산 중';
+      }
+    }
+  }
+}
+
+// [3시간 랜덤 자동 소환] 교사용 설정 컨트롤 동기화
+function syncAutoSummonSettingsUI(settings, countdown) {
+  if (!settings) return;
+  const toggleEl = document.getElementById('teacher-auto-summon-toggle');
+  const intervalEl = document.getElementById('teacher-auto-summon-interval');
+  const hpEl = document.getElementById('teacher-auto-summon-hp');
+
+  if (toggleEl && settings.enabled !== undefined) {
+    toggleEl.value = String(settings.enabled);
+  }
+  if (intervalEl && settings.intervalSec) {
+    intervalEl.value = String(settings.intervalSec);
+  }
+  if (hpEl && settings.defaultHp) {
+    hpEl.value = String(settings.defaultHp);
+  }
 }

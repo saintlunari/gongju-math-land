@@ -122,9 +122,15 @@ class SeasonManager {
       maxCount: 8       // 기본 최대 8곳 안전 제한
     };
     this.nextCorruptionCountdown = 300;
+    this.autoSummonSettings = {
+      enabled: true,
+      intervalSec: 3 * 3600, // 기본 3시간 (10,800초)
+      defaultHp: 10000
+    };
     this.data = this.loadSeasonData();
     this.checkAndInitSeason();
     this.ensureBossInitialized();
+    this.initAutoSummonSettings();
   }
 
   loadSeasonData() {
@@ -210,6 +216,46 @@ class SeasonManager {
     }
   }
 
+  // 3시간 보스 자동 소환 설정 및 스케줄 초기화/동기화
+  initAutoSummonSettings() {
+    if (this.data.autoSummonSettings) {
+      if (typeof this.data.autoSummonSettings.enabled === 'boolean') {
+        this.autoSummonSettings.enabled = this.data.autoSummonSettings.enabled;
+      }
+      if (typeof this.data.autoSummonSettings.intervalSec === 'number' && this.data.autoSummonSettings.intervalSec >= 5) {
+        this.autoSummonSettings.intervalSec = this.data.autoSummonSettings.intervalSec;
+      }
+      if (typeof this.data.autoSummonSettings.defaultHp === 'number' && this.data.autoSummonSettings.defaultHp > 0) {
+        this.autoSummonSettings.defaultHp = this.data.autoSummonSettings.defaultHp;
+      }
+    } else {
+      this.data.autoSummonSettings = { ...this.autoSummonSettings };
+    }
+    this.ensureAutoSummonSchedule();
+  }
+
+  // 다음 자동 소환 예정 시각 보정 (없거나 과거 시각이면 현재+3시간으로 설정)
+  ensureAutoSummonSchedule(forceReset = false) {
+    const now = Date.now();
+    let nextTime = this.data.nextAutoSummonAt ? new Date(this.data.nextAutoSummonAt).getTime() : 0;
+
+    if (forceReset || !nextTime || isNaN(nextTime) || nextTime <= now) {
+      nextTime = now + (this.autoSummonSettings.intervalSec * 1000);
+      this.data.nextAutoSummonAt = new Date(nextTime).toISOString();
+      this.data.autoSummonSettings = { ...this.autoSummonSettings };
+      this.saveSeasonData();
+    }
+  }
+
+  // 다음 자동 소환까지 남은 초(Countdown)
+  getNextAutoSummonCountdown() {
+    if (!this.data.nextAutoSummonAt) {
+      return this.autoSummonSettings.intervalSec;
+    }
+    const diff = Math.floor((new Date(this.data.nextAutoSummonAt).getTime() - Date.now()) / 1000);
+    return Math.max(0, diff);
+  }
+
   // 서버 시작 시 지난 주 일요일이 지났는지 검사하여 자동 초기화
   checkAndInitSeason(gameState = null, calculateRankingFn = null) {
     const now = new Date();
@@ -290,7 +336,10 @@ class SeasonManager {
       corruptedTerritories: b.corruptedTerritories || [],
       corruptedCount: (b.corruptedTerritories || []).length,
       corruptionSettings: { ...this.corruptionSettings },
-      nextCorruptionCountdown: this.nextCorruptionCountdown
+      nextCorruptionCountdown: this.nextCorruptionCountdown,
+      autoSummonSettings: this.getAutoSummonSettings(),
+      nextAutoSummonCountdown: this.getNextAutoSummonCountdown(),
+      nextAutoSummonAt: this.data.nextAutoSummonAt
     };
   }
 
@@ -339,9 +388,78 @@ class SeasonManager {
     };
 
     this.nextCorruptionCountdown = this.corruptionSettings.intervalSec;
+    // 보스가 새로 소환되면 다음 자동 소환 일정 리셋 (3시간 뒤)
+    this.ensureAutoSummonSchedule(true);
     this.saveSeasonData();
     console.log(`🐉 [시즌 보스 소환] ${tmpl.name} (HP: ${hp}) 출격 완료! (침식 주기: ${this.corruptionSettings.intervalSec}초)`);
     return this.getBossInfo();
+  }
+
+  // 4대 보스 중 무작위 1종 랜덤 소환 (3시간 자동 소환 or 교사 즉시 랜덤 소환)
+  summonRandomBoss(maxHp = null) {
+    this.ensureBossInitialized();
+    const currentBossId = this.data.currentBoss?.bossId;
+    let pool = SEASON_BOSS_TEMPLATES;
+    // 현재 보스와 다른 보스를 우선적으로 선택하여 다양성 부여
+    if (pool.length > 1 && currentBossId) {
+      const filtered = pool.filter(t => t.bossId !== currentBossId);
+      if (filtered.length > 0) pool = filtered;
+    }
+    const selectedTemplate = pool[Math.floor(Math.random() * pool.length)];
+    const hp = (typeof maxHp === 'number' && maxHp > 0) ? maxHp : (this.autoSummonSettings.defaultHp || selectedTemplate.defaultHp);
+
+    const summoned = this.summonBoss(hp, selectedTemplate.bossId);
+    console.log(`🎲 [3시간 랜덤 보스 자동 소환] [${selectedTemplate.name}] (HP: ${hp}) 출현 완료! 다음 소환: ${this.data.nextAutoSummonAt}`);
+    return summoned;
+  }
+
+  // 매 1초마다 보스 3시간 자동 소환 타이머 검사 (시간 만료 시 랜덤 보스 자동 출격)
+  tickAutoSummon(gameState) {
+    if (!this.autoSummonSettings.enabled) {
+      return null;
+    }
+
+    const countdown = this.getNextAutoSummonCountdown();
+    if (countdown <= 0) {
+      console.log(`⏰ [보스 3시간 자동 소환 타이머 도래] 새로운 랜덤 보스를 자동 소환합니다!`);
+      // 현재 보스가 raging 중이고 잠식 영토가 있다면 이전 침식 영토 정화
+      if (this.data.currentBoss && this.data.currentBoss.status === 'raging') {
+        this.purifyAllTerritories(gameState);
+      }
+      return this.summonRandomBoss();
+    }
+    return null;
+  }
+
+  // 3시간 보스 자동 소환 설정 변경 (교사 제어)
+  setAutoSummonSettings(newSettings = {}) {
+    if (typeof newSettings.enabled === 'boolean') {
+      this.autoSummonSettings.enabled = newSettings.enabled;
+    }
+    if (typeof newSettings.intervalSec === 'number' && newSettings.intervalSec >= 5) {
+      this.autoSummonSettings.intervalSec = newSettings.intervalSec;
+      const now = Date.now();
+      const currentNext = this.data.nextAutoSummonAt ? new Date(this.data.nextAutoSummonAt).getTime() : now;
+      if (currentNext - now > newSettings.intervalSec * 1000 || currentNext <= now) {
+        this.data.nextAutoSummonAt = new Date(now + newSettings.intervalSec * 1000).toISOString();
+      }
+    }
+    if (typeof newSettings.defaultHp === 'number' && newSettings.defaultHp > 0) {
+      this.autoSummonSettings.defaultHp = newSettings.defaultHp;
+    }
+    this.data.autoSummonSettings = { ...this.autoSummonSettings };
+    this.saveSeasonData();
+    return this.getAutoSummonSettings();
+  }
+
+  getAutoSummonSettings() {
+    return {
+      enabled: this.autoSummonSettings.enabled,
+      intervalSec: this.autoSummonSettings.intervalSec,
+      defaultHp: this.autoSummonSettings.defaultHp,
+      countdown: this.getNextAutoSummonCountdown(),
+      nextAutoSummonAt: this.data.nextAutoSummonAt
+    };
   }
 
   // 교사: 토벌전 강제 종료
@@ -771,6 +889,7 @@ class SeasonManager {
 
     // 다음 시즌 신규 보스 세팅
     this.data.currentBoss = this.initBossForSeason(this.data.currentSeason);
+    this.ensureAutoSummonSchedule(true);
 
     this.saveSeasonData();
     console.log(`🏆 [시즌 마감 완료] 제 ${finishedSeasonRecord.season}시즌 우승: ${finishedSeasonRecord.winningClass.name}! -> 새 시즌: ${this.data.seasonName}`);

@@ -1376,6 +1376,70 @@ body {
    시즌 보스 거대 몬스터 토벌전 (PVE 협동 모드) 스타일
    ========================================================= */
 
+/* 0. 보스 출현 대기 상태 알림 배너 (3시간 정기 소환 카운트다운) */
+.student-boss-idle-banner {
+  background: linear-gradient(135deg, rgba(30, 27, 75, 0.9) 0%, rgba(49, 46, 129, 0.85) 50%, rgba(15, 23, 42, 0.9) 100%);
+  border: 1.5px solid #8B5CF6;
+  border-radius: 14px;
+  padding: 8px 14px;
+  margin: 4px 12px 8px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: white;
+  box-shadow: 0 4px 14px rgba(139, 92, 246, 0.2);
+}
+
+.sbib-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sbib-icon {
+  font-size: 1.4rem;
+  animation: sbibIconPulse 2s infinite ease-in-out;
+}
+
+@keyframes sbibIconPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.15); }
+}
+
+.sbib-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.sbib-title {
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: #DDD6FE;
+  letter-spacing: 0.2px;
+}
+
+.sbib-sub {
+  font-size: 0.7rem;
+  color: #94A3B8;
+}
+
+.sbib-right {
+  display: flex;
+  align-items: center;
+}
+
+.sbib-timer {
+  background: rgba(139, 92, 246, 0.2);
+  border: 1px solid rgba(192, 132, 252, 0.4);
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: #FCD34D;
+  white-space: nowrap;
+}
+
 /* 1. 상단 보스 출현 알림 배너 */
 .student-boss-banner {
   background: linear-gradient(135deg, #4C1D95 0%, #BE185D 50%, #B45309 100%);

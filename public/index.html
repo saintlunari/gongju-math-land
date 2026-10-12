@@ -110,13 +110,27 @@
     </div>
   </section>
 
+  <!-- 시즌 보스 대기 상태 배너 (3시간 정기 소환 카운트다운) -->
+  <div id="student-boss-idle-banner" class="student-boss-idle-banner" style="display: none;">
+    <div class="sbib-left">
+      <span class="sbib-icon">⏰</span>
+      <div class="sbib-info">
+        <span class="sbib-title">거대 보스 3시간 정기 레이드</span>
+        <span class="sbib-sub">4대 수호신 몬스터가 3시간마다 랜덤 출현합니다!</span>
+      </div>
+    </div>
+    <div class="sbib-right">
+      <span id="sbib-timer-text" class="sbib-timer">⏳ 다음 보스 출현까지: 03시간 00분 00초</span>
+    </div>
+  </div>
+
   <!-- 시즌 보스 출현 알림 배너 (보스 레이드 활성화 시 표시) -->
   <div id="student-boss-banner" class="student-boss-banner" style="display: none;">
     <div class="sbb-left">
       <span class="sbb-flame">🔥</span>
       <span class="sbb-icon" id="sbb-icon">🐉</span>
       <div class="sbb-info">
-        <div class="sbb-tag">⚠️ 시즌 거대 보스 출현! [PVE 전원 협동 레이드]</div>
+        <div class="sbb-tag">⚡ [3시간 정기 보스 출현!] PVE 전원 협동 레이드</div>
         <div class="sbb-title" id="sbb-title">금강의 수호신 '금강대룡'</div>
       </div>
     </div>

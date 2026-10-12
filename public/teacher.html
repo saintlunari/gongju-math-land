@@ -236,8 +236,63 @@
           학급 전체가 힘을 모아 공주시 거대 보스를 물리치는 실시간 협동 레이드입니다!
         </div>
 
+        <!-- 3시간 랜덤 자동 소환 시스템 섹션 -->
+        <div style="background: rgba(30, 27, 75, 0.6); border: 1px solid #8B5CF6; border-radius: 12px; padding: 10px; margin-bottom: 12px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <div style="display: flex; align-items: center; gap: 5px;">
+              <span style="font-size: 0.95rem;">⏰</span>
+              <span style="font-size: 0.82rem; font-weight: 800; color: #C084FC;">3시간 랜덤 자동 소환</span>
+            </div>
+            <select id="teacher-auto-summon-toggle" class="select-control" style="width: auto; padding: 2px 8px; font-size: 0.78rem; font-weight: bold; background: #0F172A; border-color: #8B5CF6; color: #C084FC;">
+              <option value="true" selected>✅ 켜짐 (ON)</option>
+              <option value="false">❌ 끄기 (OFF)</option>
+            </select>
+          </div>
+
+          <!-- 실시간 자동 소환 카운트다운 게이지 -->
+          <div id="teacher-auto-summon-box" style="background: rgba(0,0,0,0.3); border-radius: 8px; padding: 8px; margin-bottom: 8px; border: 1px solid rgba(139, 92, 246, 0.25);">
+            <div style="display: flex; justify-content: space-between; font-size: 0.78rem; color: #CBD5E1; margin-bottom: 4px;">
+              <span>⏳ 다음 랜덤 보스 출현</span>
+              <span id="teacher-auto-summon-timer-text" style="color: #FCD34D; font-weight: 800;">03시간 00분 00초</span>
+            </div>
+            <div style="height: 6px; background: #1E293B; border-radius: 3px; overflow: hidden;">
+              <div id="teacher-auto-summon-bar" style="height: 100%; width: 100%; background: linear-gradient(90deg, #8B5CF6, #EC4899); transition: width 1s linear;"></div>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 0.72rem; color: #94A3B8; margin-top: 4px;">
+              <span>소환 방식: <b style="color: #A78BFA;">4대 보스 중 무작위</b></span>
+              <span id="teacher-auto-summon-next-time" style="color: #CBD5E1;">예정: 계산 중</span>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 8px;">
+            <div>
+              <label style="font-size: 0.75rem; color: #94A3B8; display: block; margin-bottom: 2px;">소환 주기</label>
+              <select id="teacher-auto-summon-interval" class="select-control" style="font-size: 0.78rem; background: #0F172A;">
+                <option value="600">10분 (시연/테스트)</option>
+                <option value="1800">30분 (빠른 로테이션)</option>
+                <option value="3600">1시간 (집중 수업)</option>
+                <option value="7200">2시간 (오전/오후)</option>
+                <option value="10800" selected>3시간 (기본 권장)</option>
+                <option value="21600">6시간 (반일 주기)</option>
+              </select>
+            </div>
+            <div>
+              <label style="font-size: 0.75rem; color: #94A3B8; display: block; margin-bottom: 2px;">출현 체력 (HP)</label>
+              <select id="teacher-auto-summon-hp" class="select-control" style="font-size: 0.78rem; background: #0F172A;">
+                <option value="7500">7500 HP</option>
+                <option value="10000" selected>10000 HP (기본)</option>
+                <option value="13000">13000 HP</option>
+              </select>
+            </div>
+          </div>
+
+          <button id="btn-summon-random-now" class="btn-ctrl" style="width: 100%; background: linear-gradient(135deg, #7C3AED, #9333EA); color: white; font-weight: 700; font-size: 0.8rem; padding: 7px; border-radius: 8px; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+            <span>🎲 지금 즉시 랜덤 보스 소환</span>
+          </button>
+        </div>
+
         <div style="margin-bottom: 8px;">
-          <label style="font-size: 0.8rem; color: #94A3B8; display: block; margin-bottom: 3px;">시즌 보스 선택</label>
+          <label style="font-size: 0.8rem; color: #94A3B8; display: block; margin-bottom: 3px;">수동 보스 직접 지정</label>
           <select id="teacher-boss-select" class="select-control" style="font-size: 0.85rem; font-weight: bold; background: #0F172A; border-color: #EC4899;">
             <option value="boss_dragon">🐉 금강의 수호신 '금강대룡' (금강)</option>
             <option value="boss_goblin" selected>🌰👹 정안 숲의 '대왕 알밤 도깨비' (정안면)</option>
