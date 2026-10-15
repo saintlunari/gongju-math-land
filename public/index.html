@@ -402,6 +402,24 @@
   </div>
 
   <!-- =======================================================
+       6.5 다중 보스 선택 모달 (출현 중인 보스 선택 참전)
+       ======================================================= -->
+  <div class="modal-overlay" id="boss-select-modal" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.88); z-index: 2150; align-items: center; justify-content: center;">
+    <div class="modal-card" style="background: #1E1B4B; border: 2px solid #8B5CF6; border-radius: 20px; padding: 20px; max-width: 500px; width: 92%; max-height: 85vh; display: flex; flex-direction: column; color: white;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid rgba(139, 92, 246, 0.4); padding-bottom: 8px;">
+        <h2 style="font-size: 1.25rem; font-weight: 800; color: #F472B6; display: flex; align-items: center; gap: 8px; margin: 0;">
+          ⚔️ 출현 중인 전설 보스 선택
+        </h2>
+        <button id="btn-close-boss-select" style="background: none; border: none; color: #94A3B8; font-size: 1.3rem; cursor: pointer;">✕</button>
+      </div>
+      <p style="font-size: 0.85rem; color: #CBD5E1; margin: 0 0 12px 0;">공략할 보스를 선택하여 협동 토벌전에 참전하세요!</p>
+      <div id="boss-select-cards-container" style="display: flex; flex-direction: column; gap: 10px; overflow-y: auto; flex: 1;">
+        <!-- 동적 생성되는 보스 카드 목록 -->
+      </div>
+    </div>
+  </div>
+
+  <!-- =======================================================
        7. 시즌 보스 거대 몬스터 실시간 협동 레이드 모달
        ======================================================= -->
   <div class="modal-overlay" id="boss-raid-modal" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.92); z-index: 2200; align-items: center; justify-content: center;">

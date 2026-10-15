@@ -1842,8 +1842,12 @@ class GongjuMap {
       const bossMarker = e.target.closest('.boss-map-marker, .boss-town-anchor');
       if (bossMarker) {
         window.soundManager?.playClick();
-        if (this.options.onBossClick && this.currentBoss) {
-          this.options.onBossClick(this.currentBoss);
+        const clickedBossId = bossMarker.dataset.bossId;
+        const targetBoss = (this.activeBossesList && clickedBossId)
+          ? this.activeBossesList.find(b => b.bossId === clickedBossId)
+          : this.currentBoss;
+        if (this.options.onBossClick && targetBoss) {
+          this.options.onBossClick(targetBoss);
         }
         return;
       }
@@ -2298,23 +2302,34 @@ class GongjuMap {
     }
   }
 
-  // 시즌 보스 거대 몬스터 지도 마커 및 침공 영토 표시 (점선 연결 및 안전 위치)
-  setBoss(bossInfo) {
-    this.currentBoss = bossInfo;
+  // 시즌 보스 거대 몬스터 지도 마커 및 침공 영토 표시 (다중 보스 동시 렌더링 지원)
+  setBoss(bossInput) {
+    let bossList = [];
+    if (Array.isArray(bossInput)) {
+      bossList = bossInput;
+    } else if (bossInput && typeof bossInput === 'object') {
+      bossList = [bossInput];
+    }
+
+    const activeList = bossList.filter(b => b && b.status === 'raging' && !b.isDefeated);
+    this.activeBossesList = activeList;
+    this.currentBoss = activeList[0] || (bossList[0] || null);
+
     const bossLayer = this.svg ? (this.svg.querySelector('.boss-marker-layer') || document.getElementById(`${this.container.id}-boss-layer`)) : null;
 
     // 이전 활성화 영토 테두리 펄스 클래스 제거
-    if (this.activeBossRegionId) {
-      const prevEl = this.domCache ? this.domCache[this.activeBossRegionId] : null;
-      const prevNode = prevEl ? prevEl.node : document.getElementById(`region-node-${this.activeBossRegionId}`);
-      if (prevNode && prevNode.classList) prevNode.classList.remove('boss-territory-active');
-      this.activeBossRegionId = null;
+    if (this.activeBossRegionIds && this.activeBossRegionIds.size > 0) {
+      this.activeBossRegionIds.forEach(regId => {
+        const prevEl = this.domCache ? this.domCache[regId] : null;
+        const prevNode = prevEl ? prevEl.node : document.getElementById(`region-node-${regId}`);
+        if (prevNode && prevNode.classList) prevNode.classList.remove('boss-territory-active');
+      });
     }
+    this.activeBossRegionIds = new Set();
 
     if (!bossLayer) return;
 
-    // 보스가 없거나 잠자고 있거나 이미 토벌된 경우 마커 제거
-    if (!bossInfo || bossInfo.status !== 'raging' || bossInfo.isDefeated) {
+    if (activeList.length === 0) {
       bossLayer.innerHTML = '';
       return;
     }
@@ -2355,100 +2370,99 @@ class GongjuMap {
       }
     };
 
-    const preset = bossPresets[bossInfo.bossId];
-    const regionId = bossInfo.regionId || (preset ? preset.regionId : 'ri_137');
-    const displayName = bossInfo.shortName || (preset ? preset.shortName : bossInfo.name) || '시즌 보스';
+    let fullHtml = '';
 
-    // 해당 마을 영토 중심 좌표 구하기
-    const targetRegion = this.layout.find(r => r.id === regionId);
-    const targetX = targetRegion ? targetRegion.cx : (preset ? preset.targetX : 565);
-    const targetY = targetRegion ? targetRegion.cy : (preset ? preset.targetY : 512);
+    activeList.forEach(bossInfo => {
+      const preset = bossPresets[bossInfo.bossId];
+      const regionId = bossInfo.regionId || (preset ? preset.regionId : 'ri_137');
+      const displayName = bossInfo.shortName || (preset ? preset.shortName : bossInfo.name) || '시즌 보스';
 
-    // 보스 마커 핀 위치 결정 (다른 마을을 가리지 않도록 마을 인근 안전 공간에 배치)
-    let pinX, pinY;
-    if (preset && (!bossInfo.regionId || bossInfo.regionId === preset.regionId)) {
-      pinX = preset.pinX;
-      pinY = preset.pinY;
-    } else {
-      // 커스텀 영토이거나 좌표 오버라이드가 있을 때
-      pinX = (typeof bossInfo.cx === 'number') ? bossInfo.cx : (targetX + 58);
-      pinY = (typeof bossInfo.cy === 'number') ? bossInfo.cy : (targetY - 38);
-    }
+      // 해당 마을 영토 중심 좌표 구하기
+      const targetRegion = this.layout.find(r => r.id === regionId);
+      const targetX = targetRegion ? targetRegion.cx : (preset ? preset.targetX : 565);
+      const targetY = targetRegion ? targetRegion.cy : (preset ? preset.targetY : 512);
 
-    // 해당 영토 하이라이트 클래스 부여 (테두리 펄스 글로우)
-    this.activeBossRegionId = regionId;
-    const targetEl = this.domCache ? this.domCache[regionId] : null;
-    const targetNode = targetEl ? targetEl.node : document.getElementById(`region-node-${regionId}`);
-    if (targetNode && targetNode.classList) {
-      targetNode.classList.add('boss-territory-active');
-    }
+      // 보스 마커 핀 위치 결정 (마을 인근 안전 공간에 배치)
+      let pinX, pinY;
+      if (preset && (!bossInfo.regionId || bossInfo.regionId === preset.regionId)) {
+        pinX = preset.pinX;
+        pinY = preset.pinY;
+      } else {
+        pinX = (typeof bossInfo.cx === 'number') ? bossInfo.cx : (targetX + 58);
+        pinY = (typeof bossInfo.cy === 'number') ? bossInfo.cy : (targetY - 38);
+      }
 
-    // 베지어 곡선 연결선 제어점 및 화살표 도달점 정밀 계산 (마을 앵커 밖에서 출발하여 보스 핀 둘레에 정확히 도달)
-    const angle = Math.atan2(pinY - targetY, pinX - targetX);
-    const startX = targetX + Math.cos(angle) * 9;
-    const startY = targetY + Math.sin(angle) * 9;
-    const endX = pinX - Math.cos(angle) * 23;
-    const endY = pinY - Math.sin(angle) * 23;
+      this.activeBossRegionIds.add(regionId);
+      const targetEl = this.domCache ? this.domCache[regionId] : null;
+      const targetNode = targetEl ? targetEl.node : document.getElementById(`region-node-${regionId}`);
+      if (targetNode && targetNode.classList) {
+        targetNode.classList.add('boss-territory-active');
+      }
 
-    const midX = (startX + endX) / 2;
-    const midY = (startY + endY) / 2;
-    const dx = endX - startX;
-    const dy = endY - startY;
-    const ctrlX = midX - dy * 0.16;
-    const ctrlY = midY + dx * 0.16;
+      // 베지어 곡선 연결선 제어점 및 화살표 도달점 정밀 계산
+      const angle = Math.atan2(pinY - targetY, pinX - targetX);
+      const startX = targetX + Math.cos(angle) * 9;
+      const startY = targetY + Math.sin(angle) * 9;
+      const endX = pinX - Math.cos(angle) * 23;
+      const endY = pinY - Math.sin(angle) * 23;
 
-    const hpPercent = bossInfo.hpPercent !== undefined
-      ? bossInfo.hpPercent
-      : (bossInfo.maxHp > 0 ? Math.round((bossInfo.currentHp / bossInfo.maxHp) * 100) : 0);
+      const midX = (startX + endX) / 2;
+      const midY = (startY + endY) / 2;
+      const dx = endX - startX;
+      const dy = endY - startY;
+      const ctrlX = midX - dy * 0.16;
+      const ctrlY = midY + dx * 0.16;
 
-    const hpBarW = 68;
-    const hpFillW = Math.max(0, Math.min(hpBarW - 2, (hpBarW - 2) * (hpPercent / 100)));
+      const hpPercent = bossInfo.hpPercent !== undefined
+        ? bossInfo.hpPercent
+        : (bossInfo.maxHp > 0 ? Math.round((bossInfo.currentHp / bossInfo.maxHp) * 100) : 0);
 
-    bossLayer.innerHTML = `
-      <!-- 1. 마을 출현지 타겟 앵커 (해당 마을 중심점) -->
-      <g class="boss-town-anchor" data-region-id="${regionId}" style="cursor: pointer;">
-        <circle class="boss-anchor-pulse" cx="${targetX}" cy="${targetY}" r="15" />
-        <circle class="boss-anchor-ring" cx="${targetX}" cy="${targetY}" r="7.5" />
-        <circle class="boss-anchor-dot" cx="${targetX}" cy="${targetY}" r="3.5" />
-        <g class="boss-anchor-tag" transform="translate(${targetX}, ${targetY + 16})">
-          <rect x="-24" y="-7" width="48" height="13" rx="4" class="boss-anchor-tag-bg" />
-          <text x="0" y="2.5" text-anchor="middle" class="boss-anchor-tag-text">📍 출현지</text>
-        </g>
-      </g>
+      const hpBarW = 68;
+      const hpFillW = Math.max(0, Math.min(hpBarW - 2, (hpBarW - 2) * (hpPercent / 100)));
 
-      <!-- 2. 해당 마을에서 보스 핀으로 꽂히는 황금빛 화살표 점선 (Leader Line) -->
-      <path class="boss-leader-line-glow" d="M ${startX.toFixed(1)},${startY.toFixed(1)} Q ${ctrlX.toFixed(1)},${ctrlY.toFixed(1)} ${endX.toFixed(1)},${endY.toFixed(1)}" />
-      <path class="boss-leader-line" d="M ${startX.toFixed(1)},${startY.toFixed(1)} Q ${ctrlX.toFixed(1)},${ctrlY.toFixed(1)} ${endX.toFixed(1)},${endY.toFixed(1)}" marker-end="url(#boss-arrow-head)" />
-
-      <!-- 3. 마을 근처 안전 여백에 위치한 보스 마커 핀 (다른 마을 가림 일체 없음) -->
-      <g class="boss-map-marker" data-boss-id="${bossInfo.bossId || ''}" transform="translate(${pinX}, ${pinY})">
-        <g class="boss-marker-content">
-          <!-- 펄스 파동 오라 2중 링 -->
-          <circle class="boss-pulse-ring ring-1" cx="0" cy="0" r="30" />
-          <circle class="boss-pulse-ring ring-2" cx="0" cy="0" r="42" />
-
-          <!-- 바닥 그림자 -->
-          <ellipse cx="0" cy="18" rx="20" ry="7" fill="rgba(0,0,0,0.4)" filter="blur(2px)" />
-
-          <!-- 보스 아바타 외곽 원 및 아이콘 -->
-          <circle class="boss-avatar-bg" cx="0" cy="0" r="22" />
-          <text class="boss-map-icon" x="0" y="7" text-anchor="middle">${bossInfo.icon || '🐉'}</text>
-
-          <!-- 보스 이름 라벨 뱃지 -->
-          <g class="boss-map-label" transform="translate(0, -30)">
-            <rect class="boss-name-badge-bg" x="-52" y="-10" width="104" height="20" rx="10" />
-            <text class="boss-name-badge-text" x="0" y="2" text-anchor="middle">⚠️ ${displayName}</text>
-          </g>
-
-          <!-- 실시간 HP 게이지 바 -->
-          <g class="boss-map-hp-bar" transform="translate(0, 28)">
-            <rect class="boss-hp-bar-bg" x="-34" y="-5.5" width="${hpBarW}" height="11" rx="5.5" />
-            <rect class="boss-hp-bar-fill" x="-33" y="-4.5" width="${hpFillW}" height="9" rx="4.5" />
-            <text class="boss-hp-bar-text" x="0" y="2" text-anchor="middle">${bossInfo.currentHp} HP (${hpPercent}%)</text>
+      fullHtml += `
+        <!-- 마을 출현지 타겟 앵커 -->
+        <g class="boss-town-anchor" data-boss-id="${bossInfo.bossId}" data-region-id="${regionId}" style="cursor: pointer;">
+          <circle class="boss-anchor-pulse" cx="${targetX}" cy="${targetY}" r="15" />
+          <circle class="boss-anchor-ring" cx="${targetX}" cy="${targetY}" r="7.5" />
+          <circle class="boss-anchor-dot" cx="${targetX}" cy="${targetY}" r="3.5" />
+          <g class="boss-anchor-tag" transform="translate(${targetX}, ${targetY + 16})">
+            <rect x="-24" y="-7" width="48" height="13" rx="4" class="boss-anchor-tag-bg" />
+            <text x="0" y="2.5" text-anchor="middle" class="boss-anchor-tag-text">📍 출현지</text>
           </g>
         </g>
-      </g>
-    `;
+
+        <!-- 해당 마을에서 보스 핀으로 꽂히는 연결선 -->
+        <path class="boss-leader-line-glow" d="M ${startX.toFixed(1)},${startY.toFixed(1)} Q ${ctrlX.toFixed(1)},${ctrlY.toFixed(1)} ${endX.toFixed(1)},${endY.toFixed(1)}" />
+        <path class="boss-leader-line" d="M ${startX.toFixed(1)},${startY.toFixed(1)} Q ${ctrlX.toFixed(1)},${ctrlY.toFixed(1)} ${endX.toFixed(1)},${endY.toFixed(1)}" marker-end="url(#boss-arrow-head)" />
+
+        <!-- 보스 마커 핀 (클릭 시 해당 보스 토벌전 참전) -->
+        <g class="boss-map-marker" data-boss-id="${bossInfo.bossId}" style="cursor: pointer;" transform="translate(${pinX}, ${pinY})">
+          <g class="boss-marker-content">
+            <circle class="boss-pulse-ring ring-1" cx="0" cy="0" r="30" />
+            <circle class="boss-pulse-ring ring-2" cx="0" cy="0" r="42" />
+
+            <ellipse cx="0" cy="18" rx="20" ry="7" fill="rgba(0,0,0,0.4)" filter="blur(2px)" />
+
+            <circle class="boss-avatar-bg" cx="0" cy="0" r="22" />
+            <text class="boss-map-icon" x="0" y="7" text-anchor="middle">${bossInfo.icon || '🐉'}</text>
+
+            <g class="boss-map-label" transform="translate(0, -30)">
+              <rect class="boss-name-badge-bg" x="-52" y="-10" width="104" height="20" rx="10" />
+              <text class="boss-name-badge-text" x="0" y="2" text-anchor="middle">⚠️ ${displayName}</text>
+            </g>
+
+            <g class="boss-map-hp-bar" transform="translate(0, 28)">
+              <rect class="boss-hp-bar-bg" x="-34" y="-5.5" width="${hpBarW}" height="11" rx="5.5" />
+              <rect class="boss-hp-bar-fill" x="-33" y="-4.5" width="${hpFillW}" height="9" rx="4.5" />
+              <text class="boss-hp-bar-text" x="0" y="2" text-anchor="middle">${bossInfo.currentHp} HP (${hpPercent}%)</text>
+            </g>
+          </g>
+        </g>
+      `;
+    });
+
+    bossLayer.innerHTML = fullHtml;
   }
 }
 

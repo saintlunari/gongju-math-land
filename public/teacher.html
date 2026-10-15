@@ -56,6 +56,9 @@
 
         <!-- 전자칠판용 거대 보스 레이드 실시간 전광판 (보스 출현 시 상단 노출) -->
         <div id="teacher-boss-overlay" class="teacher-boss-hud" style="display: none;">
+          <!-- 다중 보스 출현 시 상단 탭 선택 바 -->
+          <div id="tb-boss-tabs-container" style="display: none; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; border-bottom: 1px solid rgba(236, 72, 153, 0.35); padding-bottom: 8px;"></div>
+
           <div class="tb-boss-badge">
             <span class="tb-boss-icon" id="tb-boss-icon">🐉</span>
             <div class="tb-boss-meta">
@@ -268,6 +271,9 @@
             <div>
               <label style="font-size: 0.75rem; color: #94A3B8; display: block; margin-bottom: 2px;">소환 주기</label>
               <select id="teacher-auto-summon-interval" class="select-control" style="font-size: 0.78rem; background: #0F172A;">
+                <option value="60">1분 (초고속 테스트)</option>
+                <option value="180">3분 (테스트/단축)</option>
+                <option value="300">5분 (수업 시연)</option>
                 <option value="600">10분 (시연/테스트)</option>
                 <option value="1800">30분 (빠른 로테이션)</option>
                 <option value="3600">1시간 (집중 수업)</option>
@@ -315,8 +321,19 @@
             🐉 토벌전 소환 / 시작!
           </button>
           <button id="btn-dismiss-boss" class="btn-ctrl" style="flex: 1; background: #334155; color: #94A3B8; font-size: 0.8rem; border-radius: 10px; border: 1px solid #475569; cursor: pointer;">
-            중지
+            전체 퇴각
           </button>
+        </div>
+
+        <!-- 현재 출현 중인 보스 현황 및 개별 제어 -->
+        <div id="teacher-active-bosses-section" style="margin-top: 14px; padding-top: 10px; border-top: 1px dashed rgba(236, 72, 153, 0.4);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <span style="font-size: 0.82rem; font-weight: 800; color: #F472B6;">⚔️ 전장 출현 보스 (<span id="teacher-boss-count-badge">0</span>/4)</span>
+            <span style="font-size: 0.72rem; color: #94A3B8;">최대 4마리 동시 출현</span>
+          </div>
+          <div id="teacher-active-bosses-list" style="display: flex; flex-direction: column; gap: 8px;">
+            <div style="font-size: 0.75rem; color: #64748B; text-align: center; padding: 8px 0;">현재 출현 중인 보스가 없습니다.</div>
+          </div>
         </div>
 
         <!-- 영토 침식 시스템 제어 섹션 -->
@@ -339,7 +356,7 @@
               <div id="teacher-corruption-bar" style="height: 100%; width: 100%; background: linear-gradient(90deg, #EC4899, #EF4444); transition: width 1s linear;"></div>
             </div>
             <div style="display: flex; justify-content: space-between; font-size: 0.72rem; color: #94A3B8; margin-top: 4px;">
-              <span>잠식된 영토: <b id="teacher-corrupted-count" style="color: #F87171;">0</b>곳</span>
+              <span>총 잠식 영토: <b id="teacher-corrupted-count" style="color: #F87171;">0</b>곳</span>
               <span>최대 한도: <b id="teacher-corrupted-max">8</b>곳</span>
             </div>
           </div>
@@ -348,6 +365,8 @@
             <div>
               <label style="font-size: 0.75rem; color: #94A3B8; display: block; margin-bottom: 2px;">침식 주기</label>
               <select id="teacher-corruption-interval" class="select-control" style="font-size: 0.78rem; background: #0F172A;">
+                <option value="30">30초 (초고속 테스트)</option>
+                <option value="60">1분 (빠른 시연)</option>
                 <option value="180">3분 (빠름)</option>
                 <option value="300" selected>5분 (기본 권장)</option>
                 <option value="600">10분 (여유)</option>

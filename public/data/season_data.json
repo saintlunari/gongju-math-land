@@ -130,27 +130,27 @@
     }
   ],
   "currentBoss": {
-    "bossId": "boss_golem",
-    "name": "계룡산 삼불봉 '바위 골렘'",
-    "shortName": "계룡 바위골렘",
-    "title": "🗿 계룡산 갑사 숲길을 지키는 바위 거인",
-    "icon": "🗿⚡",
-    "badgeId": "badge_boss_golem",
-    "badgeName": "계룡산 수호 대장",
-    "badgeDesc": "계룡산의 거대한 바위 골렘을 지혜로운 곱셈 연타로 통과한 대장!",
-    "maxHp": 10000,
-    "currentHp": 10000,
-    "regionId": "ri_91",
-    "targetX": 730.1,
-    "targetY": 748.5,
-    "cx": 785,
-    "cy": 730,
+    "bossId": "boss_goblin",
+    "name": "정안 숲의 '대왕 알밤 도깨비'",
+    "shortName": "알밤 도깨비",
+    "title": "🌰 정안면 알밤을 몽땅 탐내는 거대 도깨비",
+    "icon": "🌰👹",
+    "badgeId": "badge_boss_goblin",
+    "badgeName": "알밤 도깨비 퇴치단",
+    "badgeDesc": "정안 알밤을 지키기 위해 알밤 도깨비를 물리친 용감한 수호대!",
+    "maxHp": 1000,
+    "currentHp": 1000,
+    "regionId": "ri_21",
+    "targetX": 658.9,
+    "targetY": 203.4,
+    "cx": 708,
+    "cy": 185,
     "isDefeated": false,
-    "status": "sleeping",
-    "location": "계룡면 중장리 (갑사)",
-    "story": "계룡산 삼불봉에서 내려온 단단한 바위 골렘! 곱셈 콤보 공격으로 바위 방패를 깨고 계룡산의 평화를 되찾으세요!",
+    "status": "raging",
+    "location": "정안면 평정리 (알밤특구)",
+    "story": "정안면의 달콤한 알밤을 모두 가져가려는 장난꾸러기 거대 도깨비! 구구단 문제를 척척 풀어 도깨비의 방망이를 멈추게 하세요!",
     "rewardScore": 100,
-    "summonedAt": null,
+    "summonedAt": "2026-10-15T01:56:34.525Z",
     "defeatedAt": null,
     "totalDamageDealt": 0,
     "contributors": {},
@@ -168,5 +168,314 @@
     "intervalSec": 10800,
     "defaultHp": 10000
   },
-  "nextAutoSummonAt": "2026-10-12T03:36:01.545Z"
+  "nextAutoSummonAt": "2026-10-15T04:56:34.525Z",
+  "activeBosses": [
+    {
+      "bossId": "boss_dragon",
+      "name": "금강의 수호신 '금강대룡'",
+      "shortName": "금강대룡",
+      "title": "🌊 공주시 금강을 뒤흔드는 푸른 전설의 용",
+      "icon": "🐉",
+      "badgeId": "badge_boss_dragon",
+      "badgeName": "금강룡 토벌 영웅",
+      "badgeDesc": "금강을 지키는 거대 수호용과의 곱셈 대결에서 승리한 영웅!",
+      "maxHp": 50,
+      "currentHp": 0,
+      "regionId": "ri_134",
+      "targetX": 614.1,
+      "targetY": 507.4,
+      "cx": 575,
+      "cy": 465,
+      "isDefeated": true,
+      "status": "defeated",
+      "location": "공주시 금강 본류 (신관동·금성동 사이)",
+      "story": "공주시 한가운데를 흐르는 금강에서 깨어난 거대 수호용 금강대룡! 2학년 친구들의 단합된 구구단 주문으로 용을 감동시켜 공주시를 수호하게 만들어야 합니다!",
+      "rewardScore": 100,
+      "summonedAt": "2026-10-15T01:56:34.516Z",
+      "defeatedAt": "2026-10-15T01:56:34.523Z",
+      "totalDamageDealt": 50,
+      "contributors": {
+        "okTJ1xKLPgb04MMoAAAJ": {
+          "id": "okTJ1xKLPgb04MMoAAAJ",
+          "name": "테스트민준",
+          "avatar": "🐱",
+          "color": "#2563EB",
+          "teamId": "team_1",
+          "damage": 50,
+          "hits": 1
+        }
+      },
+      "teamDamage": {
+        "team_1": 50,
+        "team_2": 0,
+        "team_3": 0,
+        "team_4": 0
+      },
+      "lastHitLog": [
+        {
+          "studentName": "테스트민준",
+          "avatar": "🐱",
+          "teamId": "team_1",
+          "damage": 50,
+          "isCrit": true,
+          "time": 1792029394523
+        }
+      ],
+      "corruptedTerritories": []
+    },
+    {
+      "bossId": "boss_goblin",
+      "name": "정안 숲의 '대왕 알밤 도깨비'",
+      "shortName": "알밤 도깨비",
+      "title": "🌰 정안면 알밤을 몽땅 탐내는 거대 도깨비",
+      "icon": "🌰👹",
+      "badgeId": "badge_boss_goblin",
+      "badgeName": "알밤 도깨비 퇴치단",
+      "badgeDesc": "정안 알밤을 지키기 위해 알밤 도깨비를 물리친 용감한 수호대!",
+      "maxHp": 1000,
+      "currentHp": 1000,
+      "regionId": "ri_21",
+      "targetX": 658.9,
+      "targetY": 203.4,
+      "cx": 708,
+      "cy": 185,
+      "isDefeated": false,
+      "status": "raging",
+      "location": "정안면 평정리 (알밤특구)",
+      "story": "정안면의 달콤한 알밤을 모두 가져가려는 장난꾸러기 거대 도깨비! 구구단 문제를 척척 풀어 도깨비의 방망이를 멈추게 하세요!",
+      "rewardScore": 100,
+      "summonedAt": "2026-10-15T01:56:34.525Z",
+      "defeatedAt": null,
+      "totalDamageDealt": 0,
+      "contributors": {},
+      "teamDamage": {
+        "team_1": 0,
+        "team_2": 0,
+        "team_3": 0,
+        "team_4": 0
+      },
+      "lastHitLog": [],
+      "corruptedTerritories": []
+    },
+    {
+      "bossId": "boss_golem",
+      "name": "계룡산 삼불봉 '바위 골렘'",
+      "shortName": "계룡 바위골렘",
+      "title": "🗿 계룡산 갑사 숲길을 지키는 바위 거인",
+      "icon": "🗿⚡",
+      "badgeId": "badge_boss_golem",
+      "badgeName": "계룡산 수호 대장",
+      "badgeDesc": "계룡산의 거대한 바위 골렘을 지혜로운 곱셈 연타로 통과한 대장!",
+      "maxHp": 1000,
+      "currentHp": 1000,
+      "regionId": "ri_91",
+      "targetX": 730.1,
+      "targetY": 748.5,
+      "cx": 785,
+      "cy": 730,
+      "isDefeated": false,
+      "status": "sleeping",
+      "location": "계룡면 중장리 (갑사)",
+      "story": "계룡산 삼불봉에서 내려온 단단한 바위 골렘! 곱셈 콤보 공격으로 바위 방패를 깨고 계룡산의 평화를 되찾으세요!",
+      "rewardScore": 100,
+      "summonedAt": "2026-10-15T01:27:28.833Z",
+      "defeatedAt": null,
+      "totalDamageDealt": 0,
+      "contributors": {},
+      "teamDamage": {
+        "team_1": 0,
+        "team_2": 0,
+        "team_3": 0,
+        "team_4": 0
+      },
+      "lastHitLog": [],
+      "corruptedTerritories": [
+        {
+          "regionId": "ri_91",
+          "regionName": "중장리",
+          "town": "계룡면",
+          "prevData": {
+            "ownerId": null,
+            "ownerName": null,
+            "ownerColor": null,
+            "ownerAvatar": null,
+            "capturedBy": null,
+            "capturedById": null,
+            "shield": 0
+          },
+          "corruptedAt": "2026-10-15T01:34:08.526Z"
+        },
+        {
+          "regionId": "ri_103",
+          "regionName": "죽곡리",
+          "town": "계룡면",
+          "prevData": {
+            "ownerId": null,
+            "ownerName": null,
+            "ownerColor": null,
+            "ownerAvatar": null,
+            "capturedBy": null,
+            "capturedById": null,
+            "shield": 0
+          },
+          "corruptedAt": "2026-10-15T01:39:10.282Z"
+        },
+        {
+          "regionId": "ri_98",
+          "regionName": "기산리",
+          "town": "계룡면",
+          "prevData": {
+            "ownerId": null,
+            "ownerName": null,
+            "ownerColor": null,
+            "ownerAvatar": null,
+            "capturedBy": null,
+            "capturedById": null,
+            "shield": 0
+          },
+          "corruptedAt": "2026-10-15T01:44:11.705Z"
+        },
+        {
+          "regionId": "ri_101",
+          "regionName": "내흥리",
+          "town": "계룡면",
+          "prevData": {
+            "ownerId": null,
+            "ownerName": null,
+            "ownerColor": null,
+            "ownerAvatar": null,
+            "capturedBy": null,
+            "capturedById": null,
+            "shield": 0
+          },
+          "corruptedAt": "2026-10-15T01:49:13.370Z"
+        },
+        {
+          "regionId": "ri_87",
+          "regionName": "하신리",
+          "town": "반포면",
+          "prevData": {
+            "ownerId": null,
+            "ownerName": null,
+            "ownerColor": null,
+            "ownerAvatar": null,
+            "capturedBy": null,
+            "capturedById": null,
+            "shield": 0
+          },
+          "corruptedAt": "2026-10-15T01:54:15.049Z"
+        }
+      ]
+    },
+    {
+      "bossId": "boss_phoenix",
+      "name": "공산성 수호 '황금 불사조'",
+      "shortName": "황금 불사조",
+      "title": "🦅 백제 웅진성 상공을 비행하는 황금빛 불사조",
+      "icon": "🦅🔥",
+      "badgeId": "badge_boss_phoenix",
+      "badgeName": "공산성 불사조 마스터",
+      "badgeDesc": "공산성의 하늘을 밝히는 황금 불사조의 지혜 시험을 통과한 마스터!",
+      "maxHp": 1000,
+      "currentHp": 1000,
+      "regionId": "ri_127",
+      "targetX": 627.7,
+      "targetY": 528.6,
+      "cx": 668,
+      "cy": 490,
+      "isDefeated": false,
+      "status": "sleeping",
+      "location": "중학동 (공산성 성벽)",
+      "story": "공산성 진남루 위로 날아오른 백제의 전설 불사조! 뜨거운 지혜의 불꽃 구구단 문제를 모두 맞혀 불사조의 축복을 받으세요!",
+      "rewardScore": 100,
+      "summonedAt": "2026-10-15T01:27:28.834Z",
+      "defeatedAt": null,
+      "totalDamageDealt": 0,
+      "contributors": {},
+      "teamDamage": {
+        "team_1": 0,
+        "team_2": 0,
+        "team_3": 0,
+        "team_4": 0
+      },
+      "lastHitLog": [],
+      "corruptedTerritories": [
+        {
+          "regionId": "ri_127",
+          "regionName": "중학동",
+          "town": "중학동",
+          "prevData": {
+            "ownerId": null,
+            "ownerName": null,
+            "ownerColor": null,
+            "ownerAvatar": null,
+            "capturedBy": null,
+            "capturedById": null,
+            "shield": 0
+          },
+          "corruptedAt": "2026-10-15T01:34:08.528Z"
+        },
+        {
+          "regionId": "ri_130",
+          "regionName": "중성동",
+          "town": "중학동",
+          "prevData": {
+            "ownerId": null,
+            "ownerName": null,
+            "ownerColor": null,
+            "ownerAvatar": null,
+            "capturedBy": null,
+            "capturedById": null,
+            "shield": 0
+          },
+          "corruptedAt": "2026-10-15T01:39:10.283Z"
+        },
+        {
+          "regionId": "ri_128",
+          "regionName": "반죽동",
+          "town": "중학동",
+          "prevData": {
+            "ownerId": null,
+            "ownerName": null,
+            "ownerColor": null,
+            "ownerAvatar": null,
+            "capturedBy": null,
+            "capturedById": null,
+            "shield": 0
+          },
+          "corruptedAt": "2026-10-15T01:44:11.706Z"
+        },
+        {
+          "regionId": "ri_129",
+          "regionName": "봉황동",
+          "town": "중학동",
+          "prevData": {
+            "ownerId": null,
+            "ownerName": null,
+            "ownerColor": null,
+            "ownerAvatar": null,
+            "capturedBy": null,
+            "capturedById": null,
+            "shield": 0
+          },
+          "corruptedAt": "2026-10-15T01:49:13.372Z"
+        },
+        {
+          "regionId": "ri_139",
+          "regionName": "옥룡동",
+          "town": "옥룡동",
+          "prevData": {
+            "ownerId": null,
+            "ownerName": null,
+            "ownerColor": null,
+            "ownerAvatar": null,
+            "capturedBy": null,
+            "capturedById": null,
+            "shield": 0
+          },
+          "corruptedAt": "2026-10-15T01:54:15.049Z"
+        }
+      ]
+    }
+  ]
 }

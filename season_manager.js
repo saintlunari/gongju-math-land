@@ -115,7 +115,8 @@ function getWeekKey(date = new Date()) {
 }
 
 class SeasonManager {
-  constructor() {
+  constructor(filePath = SEASON_FILE_PATH) {
+    this.filePath = filePath;
     this.corruptionSettings = {
       enabled: true,
       intervalSec: 300, // 기본 5분마다 1곳씩 (300초)
@@ -135,8 +136,8 @@ class SeasonManager {
 
   loadSeasonData() {
     try {
-      if (fs.existsSync(SEASON_FILE_PATH)) {
-        const raw = fs.readFileSync(SEASON_FILE_PATH, 'utf8');
+      if (fs.existsSync(this.filePath)) {
+        const raw = fs.readFileSync(this.filePath, 'utf8');
         return JSON.parse(raw);
       }
     } catch (e) {
@@ -158,9 +159,9 @@ class SeasonManager {
 
   saveSeasonData(dataToSave = this.data) {
     try {
-      const dir = path.dirname(SEASON_FILE_PATH);
+      const dir = path.dirname(this.filePath);
       if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-      fs.writeFileSync(SEASON_FILE_PATH, JSON.stringify(dataToSave, null, 2), 'utf8');
+      fs.writeFileSync(this.filePath, JSON.stringify(dataToSave, null, 2), 'utf8');
     } catch (e) {
       console.error('[시즌 관리] 시즌 데이터 저장 실패:', e);
     }
@@ -206,14 +207,73 @@ class SeasonManager {
     };
   }
 
-  // 보스 데이터 누락 시 안전 보정
+  // 보스 데이터 누락 시 안전 보정 및 4대 보스 동시 관리 초기화
   ensureBossInitialized() {
-    if (!this.data.currentBoss || !this.data.currentBoss.bossId) {
-      this.data.currentBoss = this.initBossForSeason(this.data.currentSeason);
-      this.saveSeasonData();
-    } else if (!this.data.currentBoss.corruptedTerritories) {
-      this.data.currentBoss.corruptedTerritories = [];
+    if (!this.data.activeBosses || !Array.isArray(this.data.activeBosses)) {
+      this.data.activeBosses = [];
     }
+
+    SEASON_BOSS_TEMPLATES.forEach(tmpl => {
+      let existing = this.data.activeBosses.find(b => b.bossId === tmpl.bossId);
+      if (!existing) {
+        if (this.data.currentBoss && this.data.currentBoss.bossId === tmpl.bossId) {
+          existing = this.data.currentBoss;
+        } else {
+          existing = {
+            bossId: tmpl.bossId,
+            name: tmpl.name,
+            shortName: tmpl.shortName,
+            title: tmpl.title,
+            icon: tmpl.icon,
+            badgeId: tmpl.badgeId,
+            badgeName: tmpl.badgeName,
+            badgeDesc: tmpl.badgeDesc,
+            maxHp: tmpl.defaultHp,
+            currentHp: tmpl.defaultHp,
+            regionId: tmpl.regionId,
+            targetX: tmpl.targetX || tmpl.cx,
+            targetY: tmpl.targetY || tmpl.cy,
+            cx: tmpl.cx,
+            cy: tmpl.cy,
+            isDefeated: false,
+            status: 'sleeping',
+            location: tmpl.location,
+            story: tmpl.story,
+            rewardScore: tmpl.rewardScore,
+            summonedAt: null,
+            defeatedAt: null,
+            totalDamageDealt: 0,
+            contributors: {},
+            teamDamage: { team_1: 0, team_2: 0, team_3: 0, team_4: 0 },
+            lastHitLog: [],
+            corruptedTerritories: []
+          };
+        }
+        this.data.activeBosses.push(existing);
+      }
+      if (!existing.corruptedTerritories) {
+        existing.corruptedTerritories = [];
+      }
+    });
+
+    const raging = this.data.activeBosses.find(b => b.status === 'raging' && !b.isDefeated);
+    this.data.currentBoss = raging || this.data.activeBosses[0];
+  }
+
+  // 특정 보스 검색 헬퍼
+  findBoss(bossId = null) {
+    this.ensureBossInitialized();
+    if (!bossId) {
+      const raging = this.data.activeBosses.find(b => b.status === 'raging' && !b.isDefeated);
+      return raging || this.data.currentBoss || this.data.activeBosses[0];
+    }
+    return this.data.activeBosses.find(b => b.bossId === bossId) || this.data.currentBoss;
+  }
+
+  // 현재 출현(raging) 중인 모든 보스 목록
+  getActiveRagingBosses() {
+    this.ensureBossInitialized();
+    return this.data.activeBosses.filter(b => b && b.status === 'raging' && !b.isDefeated);
   }
 
   // 3시간 보스 자동 소환 설정 및 스케줄 초기화/동기화
@@ -295,10 +355,10 @@ class SeasonManager {
     };
   }
 
-  // 보스 실시간 정보 요약 (클라이언트 전송용)
-  getBossInfo() {
+  // 보스 실시간 정보 요약 (클라이언트 전송용, 특정 보스 또는 주 보스)
+  getBossInfo(bossId = null) {
     this.ensureBossInitialized();
-    const b = this.data.currentBoss;
+    const b = this.findBoss(bossId);
     const hpPercent = b.maxHp > 0 ? Math.max(0, Math.min(100, Math.round((b.currentHp / b.maxHp) * 1000) / 10)) : 0;
 
     // 기여자 랭킹 상위 정렬
@@ -343,7 +403,13 @@ class SeasonManager {
     };
   }
 
-  // 교사: 보스 토벌전 소환 / 시작
+  // 4대 보스 전체 정보 목록 (교사 대시보드 및 다중 보스 레이드 UI용)
+  getAllBossesInfo() {
+    this.ensureBossInitialized();
+    return SEASON_BOSS_TEMPLATES.map(tmpl => this.getBossInfo(tmpl.bossId));
+  }
+
+  // 교사: 보스 토벌전 소환 / 시작 (특정 보스 출격)
   summonBoss(maxHp = null, bossTemplateId = null) {
     this.ensureBossInitialized();
 
@@ -355,65 +421,85 @@ class SeasonManager {
       tmpl = this.getBossTemplateForSeason(this.data.currentSeason);
     }
 
-    const hp = (typeof maxHp === 'number' && maxHp > 0) ? maxHp : tmpl.defaultHp;
+    const hp = (typeof maxHp === 'number' && maxHp > 0) ? maxHp : (this.autoSummonSettings.defaultHp || tmpl.defaultHp);
 
-    this.data.currentBoss = {
-      bossId: tmpl.bossId,
-      name: tmpl.name,
-      shortName: tmpl.shortName,
-      title: tmpl.title,
-      icon: tmpl.icon,
-      badgeId: tmpl.badgeId,
-      badgeName: tmpl.badgeName,
-      badgeDesc: tmpl.badgeDesc,
-      maxHp: hp,
-      currentHp: hp,
-      regionId: tmpl.regionId,
-      targetX: tmpl.targetX || tmpl.cx,
-      targetY: tmpl.targetY || tmpl.cy,
-      cx: tmpl.cx,
-      cy: tmpl.cy,
-      isDefeated: false,
-      status: 'raging', // 토벌전 출격!
-      location: tmpl.location,
-      story: tmpl.story,
-      rewardScore: tmpl.rewardScore,
-      summonedAt: new Date().toISOString(),
-      defeatedAt: null,
-      totalDamageDealt: 0,
-      contributors: {},
-      teamDamage: { team_1: 0, team_2: 0, team_3: 0, team_4: 0 },
-      lastHitLog: [],
-      corruptedTerritories: []
-    };
+    let targetBoss = this.data.activeBosses.find(b => b.bossId === tmpl.bossId);
+    if (!targetBoss) {
+      targetBoss = {
+        bossId: tmpl.bossId,
+        name: tmpl.name,
+        shortName: tmpl.shortName,
+        title: tmpl.title,
+        icon: tmpl.icon,
+        badgeId: tmpl.badgeId,
+        badgeName: tmpl.badgeName,
+        badgeDesc: tmpl.badgeDesc,
+        maxHp: hp,
+        currentHp: hp,
+        regionId: tmpl.regionId,
+        targetX: tmpl.targetX || tmpl.cx,
+        targetY: tmpl.targetY || tmpl.cy,
+        cx: tmpl.cx,
+        cy: tmpl.cy,
+        isDefeated: false,
+        status: 'raging',
+        location: tmpl.location,
+        story: tmpl.story,
+        rewardScore: tmpl.rewardScore,
+        summonedAt: new Date().toISOString(),
+        defeatedAt: null,
+        totalDamageDealt: 0,
+        contributors: {},
+        teamDamage: { team_1: 0, team_2: 0, team_3: 0, team_4: 0 },
+        lastHitLog: [],
+        corruptedTerritories: []
+      };
+      this.data.activeBosses.push(targetBoss);
+    } else {
+      targetBoss.status = 'raging';
+      targetBoss.isDefeated = false;
+      targetBoss.maxHp = hp;
+      targetBoss.currentHp = hp;
+      targetBoss.summonedAt = new Date().toISOString();
+      targetBoss.defeatedAt = null;
+      targetBoss.totalDamageDealt = 0;
+      targetBoss.contributors = {};
+      targetBoss.teamDamage = { team_1: 0, team_2: 0, team_3: 0, team_4: 0 };
+      targetBoss.lastHitLog = [];
+      if (!targetBoss.corruptedTerritories) targetBoss.corruptedTerritories = [];
+    }
 
+    this.data.currentBoss = targetBoss;
     this.nextCorruptionCountdown = this.corruptionSettings.intervalSec;
-    // 보스가 새로 소환되면 다음 자동 소환 일정 리셋 (3시간 뒤)
     this.ensureAutoSummonSchedule(true);
     this.saveSeasonData();
-    console.log(`🐉 [시즌 보스 소환] ${tmpl.name} (HP: ${hp}) 출격 완료! (침식 주기: ${this.corruptionSettings.intervalSec}초)`);
-    return this.getBossInfo();
+    console.log(`🐉 [시즌 보스 소환] [${tmpl.name}] (HP: ${hp}) 출격 완료! (침식 주기: ${this.corruptionSettings.intervalSec}초)`);
+    return this.getBossInfo(tmpl.bossId);
   }
 
-  // 4대 보스 중 무작위 1종 랜덤 소환 (3시간 자동 소환 or 교사 즉시 랜덤 소환)
+  // 4대 보스 중 미소환된 보스 1종 랜덤 추가 소환 (최대 4마리까지 동시 출현 가능)
   summonRandomBoss(maxHp = null) {
     this.ensureBossInitialized();
-    const currentBossId = this.data.currentBoss?.bossId;
-    let pool = SEASON_BOSS_TEMPLATES;
-    // 현재 보스와 다른 보스를 우선적으로 선택하여 다양성 부여
-    if (pool.length > 1 && currentBossId) {
-      const filtered = pool.filter(t => t.bossId !== currentBossId);
-      if (filtered.length > 0) pool = filtered;
+    // 현재 raging 중이지 않거나 이미 토벌된 보스 풀 탐색
+    const availableTemplates = SEASON_BOSS_TEMPLATES.filter(t => {
+      const b = this.findBoss(t.bossId);
+      return !b || b.status !== 'raging' || b.isDefeated;
+    });
+
+    if (availableTemplates.length === 0) {
+      console.log(`⚠️ [보스 소환 한도] 이미 4대 보스가 모두 출현 중입니다. (최대 4마리 한도)`);
+      return null;
     }
-    const selectedTemplate = pool[Math.floor(Math.random() * pool.length)];
+
+    const selectedTemplate = availableTemplates[Math.floor(Math.random() * availableTemplates.length)];
     const hp = (typeof maxHp === 'number' && maxHp > 0) ? maxHp : (this.autoSummonSettings.defaultHp || selectedTemplate.defaultHp);
 
     const summoned = this.summonBoss(hp, selectedTemplate.bossId);
-    console.log(`🎲 [3시간 랜덤 보스 자동 소환] [${selectedTemplate.name}] (HP: ${hp}) 출현 완료! 다음 소환: ${this.data.nextAutoSummonAt}`);
+    console.log(`🎲 [보스 자동/랜덤 추가 출현] [${selectedTemplate.name}] (HP: ${hp}) 전장 참전! 다음 소환 예정: ${this.data.nextAutoSummonAt}`);
     return summoned;
   }
 
-  // 매 1초마다 보스 3시간 자동 소환 타이머 검사 (시간 만료 시 랜덤 보스 자동 출격)
+  // 매 1초마다 보스 자동 소환 타이머 검사 (시간 만료 시 기존 보스 및 영토는 유지, 새 보스 추가 리젠)
   tickAutoSummon(gameState) {
     if (!this.autoSummonSettings.enabled) {
       return null;
@@ -421,12 +507,10 @@ class SeasonManager {
 
     const countdown = this.getNextAutoSummonCountdown();
     if (countdown <= 0) {
-      console.log(`⏰ [보스 3시간 자동 소환 타이머 도래] 새로운 랜덤 보스를 자동 소환합니다!`);
-      // 현재 보스가 raging 중이고 잠식 영토가 있다면 이전 침식 영토 정화
-      if (this.data.currentBoss && this.data.currentBoss.status === 'raging') {
-        this.purifyAllTerritories(gameState);
-      }
-      return this.summonRandomBoss();
+      console.log(`⏰ [보스 자동 소환 주기 도래] 기존 보스를 유지한 채 새로운 전설 보스를 추가 리젠합니다!`);
+      const summoned = this.summonRandomBoss();
+      this.ensureAutoSummonSchedule(true);
+      return summoned;
     }
     return null;
   }
@@ -462,13 +546,25 @@ class SeasonManager {
     };
   }
 
-  // 교사: 토벌전 강제 종료
-  dismissBoss() {
+  // 교사: 특정 보스 또는 전체 보스 토벌전 강제 종료(퇴각)
+  dismissBoss(bossId = null) {
     this.ensureBossInitialized();
-    this.data.currentBoss.status = 'sleeping';
+    if (bossId) {
+      const b = this.findBoss(bossId);
+      if (b) {
+        b.status = 'sleeping';
+        console.log(`⚔️ [보스 개별 퇴각] [${b.name}]이(가) 교사 권한으로 퇴각했습니다.`);
+      }
+    } else {
+      this.data.activeBosses.forEach(b => {
+        b.status = 'sleeping';
+      });
+      console.log(`⚔️ [시즌 보스 전체 퇴각] 모든 보스 토벌전이 교사 권한으로 종료되었습니다.`);
+    }
+    const raging = this.data.activeBosses.find(b => b.status === 'raging' && !b.isDefeated);
+    this.data.currentBoss = raging || this.data.activeBosses[0];
     this.saveSeasonData();
-    console.log(`⚔️ [시즌 보스 퇴각] 보스 토벌전이 교사 권한으로 종료되었습니다.`);
-    return this.getBossInfo();
+    return this.getBossInfo(bossId);
   }
 
   // 침식 설정 변경 (교사 제어)
@@ -499,38 +595,52 @@ class SeasonManager {
     return this.nextCorruptionCountdown;
   }
 
-  getCorruptedCount() {
+  getCorruptedCount(bossId = null) {
     this.ensureBossInitialized();
-    return (this.data.currentBoss?.corruptedTerritories || []).length;
+    if (bossId) {
+      const b = this.findBoss(bossId);
+      return (b?.corruptedTerritories || []).length;
+    }
+    let total = 0;
+    (this.data.activeBosses || []).forEach(b => {
+      total += (b.corruptedTerritories || []).length;
+    });
+    return total;
   }
 
   getMaxCorrupted() {
     return this.corruptionSettings.maxCount;
   }
 
-  // 매 1초마다 호출되는 침식 타이머 틱
+  // 매 1초마다 호출되는 침식 타이머 틱 (모든 활성 보스가 침식 주기마다 각각 1곳씩 동시 침식)
   tickCorruption(gameState) {
     this.ensureBossInitialized();
-    const b = this.data.currentBoss;
-    if (!b || b.status !== 'raging' || b.isDefeated) {
+    if (!this.corruptionSettings.enabled) {
       return null;
     }
-    if (!this.corruptionSettings.enabled) {
+
+    const ragingBosses = this.getActiveRagingBosses();
+    if (ragingBosses.length === 0) {
       return null;
     }
 
     this.nextCorruptionCountdown -= 1;
     if (this.nextCorruptionCountdown <= 0) {
       this.nextCorruptionCountdown = this.corruptionSettings.intervalSec;
-      return this.corruptNextTerritory(gameState);
+      const results = [];
+      for (const b of ragingBosses) {
+        const res = this.corruptNextTerritory(gameState, b.bossId);
+        if (res) results.push(res);
+      }
+      return results.length > 0 ? results : null;
     }
     return null;
   }
 
-  // 다음 인접 영토 잠식 실행 (BFS 인접 탐색 & 방어막 상호작용)
-  corruptNextTerritory(gameState) {
+  // 다음 인접 영토 잠식 실행 (보스별 독립 거점/침식지 기반 BFS 인접 탐색 & 방어막 상호작용)
+  corruptNextTerritory(gameState, targetBossId = null) {
     this.ensureBossInitialized();
-    const b = this.data.currentBoss;
+    const b = this.findBoss(targetBossId);
     if (!b || b.status !== 'raging' || b.isDefeated) {
       return null;
     }
@@ -540,40 +650,45 @@ class SeasonManager {
 
     if (!b.corruptedTerritories) b.corruptedTerritories = [];
 
-    // 최대 잠식 한도 체크
+    // 보스 1마리당 최대 잠식 한도 체크
     if (b.corruptedTerritories.length >= this.corruptionSettings.maxCount) {
       return {
         action: 'max_limit_reached',
         totalCorrupted: b.corruptedTerritories.length,
         maxCount: this.corruptionSettings.maxCount,
-        boss: this.getBossInfo()
+        boss: this.getBossInfo(b.bossId)
       };
     }
 
     const allRegions = Object.values(gameState.regions);
-    const corruptedIds = new Set(b.corruptedTerritories.map(t => t.regionId));
+    // 모든 활성 보스가 이미 잠식한 전체 영토 ID 수집 (다른 보스의 침식지는 중복 침식 불가)
+    const allCorruptedIds = new Set();
+    (this.data.activeBosses || []).forEach(bossObj => {
+      (bossObj.corruptedTerritories || []).forEach(t => allCorruptedIds.add(t.regionId));
+    });
+
+    const thisBossCorruptedIds = new Set(b.corruptedTerritories.map(t => t.regionId));
 
     let candidate = null;
 
-    // 1순위: 보스 출현 거점 영토 자체 (아직 잠식되지 않았다면 최우선 대상)
+    // 1순위: 이 보스의 출현 거점 영토 자체 (아직 아무도 잠식 안 했으면 최우선 침식)
     const originId = b.regionId || 'ri_134';
     const originRegion = gameState.regions[originId];
-    if (originRegion && !originRegion.isCorrupted && !corruptedIds.has(originId)) {
+    if (originRegion && !originRegion.isCorrupted && !allCorruptedIds.has(originId) && originRegion.ownerId !== 'boss') {
       candidate = originRegion;
     } else {
-      // 2순위: 이미 잠식된 영토들(또는 거점 영토)과 국경이 맞닿아 있는 인접 영토 탐색
+      // 2순위: 이 보스의 거점 영토 또는 이 보스가 이미 침식한 영토와 맞닿아 있는 인접 영토 탐색
       const sourceRegions = [];
       if (originRegion) sourceRegions.push(originRegion);
-      corruptedIds.forEach(id => {
+      thisBossCorruptedIds.forEach(id => {
         if (gameState.regions[id] && !sourceRegions.some(sr => sr.id === id)) {
           sourceRegions.push(gameState.regions[id]);
         }
       });
 
-      // sourceRegions의 인접 영토 중 아직 잠식되지 않은 후보군 수집
       const adjacentCandidates = [];
       allRegions.forEach(reg => {
-        if (reg.isCorrupted || corruptedIds.has(reg.id) || reg.ownerId === 'boss') return;
+        if (reg.isCorrupted || allCorruptedIds.has(reg.id) || reg.ownerId === 'boss') return;
         if (typeof reg.cx !== 'number' || typeof reg.cy !== 'number') return;
 
         // sourceRegions 중 적어도 하나와 인접한지 확인 (거리 85 이하 또는 같은 읍면동)
@@ -589,11 +704,8 @@ class SeasonManager {
       });
 
       if (adjacentCandidates.length > 0) {
-        // 우선순위 정렬:
-        // 1) 방어막이 낮거나 없는 곳 (shield: 0 또는 1)
-        // 2) 보스 거점(targetX, targetY)과 물리적 거리가 가까운 곳
-        const bossX = (typeof b.targetX === 'number') ? b.targetX : 600;
-        const bossY = (typeof b.targetY === 'number') ? b.targetY : 500;
+        const bossX = (typeof b.targetX === 'number') ? b.targetX : (b.cx || 600);
+        const bossY = (typeof b.targetY === 'number') ? b.targetY : (b.cy || 500);
 
         adjacentCandidates.sort((a, bReg) => {
           const aShield = a.shield || 0;
@@ -608,11 +720,11 @@ class SeasonManager {
 
         candidate = adjacentCandidates[0];
       } else {
-        // 인접 후보가 없을 시: 남은 영토 중 보스와 가장 가까운 곳
-        const uncorrupted = allRegions.filter(r => !r.isCorrupted && !corruptedIds.has(r.id) && r.ownerId !== 'boss');
+        // 인접 후보가 없을 시: 남은 미잠식 영토 중 보스 위치와 가장 가까운 곳
+        const uncorrupted = allRegions.filter(r => !r.isCorrupted && !allCorruptedIds.has(r.id) && r.ownerId !== 'boss');
         if (uncorrupted.length > 0) {
-          const bossX = (typeof b.targetX === 'number') ? b.targetX : 600;
-          const bossY = (typeof b.targetY === 'number') ? b.targetY : 500;
+          const bossX = (typeof b.targetX === 'number') ? b.targetX : (b.cx || 600);
+          const bossY = (typeof b.targetY === 'number') ? b.targetY : (b.cy || 500);
           uncorrupted.sort((a, bReg) => {
             const distA = Math.hypot(a.cx - bossX, a.cy - bossY);
             const distB = Math.hypot(bReg.cx - bossX, bReg.cy - bossY);
@@ -638,7 +750,7 @@ class SeasonManager {
         regionName: candidate.name,
         town: candidate.town,
         shieldRemaining: candidate.shield,
-        boss: this.getBossInfo()
+        boss: this.getBossInfo(b.bossId)
       };
     }
 
@@ -678,14 +790,14 @@ class SeasonManager {
       region: candidate,
       prevData,
       totalCorrupted: b.corruptedTerritories.length,
-      boss: this.getBossInfo()
+      boss: this.getBossInfo(b.bossId)
     };
   }
 
-  // 보스 토벌 성공 또는 교사 수동 정화 시: 모든 잠식 영토 일괄 대정화(Purification)
-  purifyAllTerritories(gameState) {
+  // 특정 보스의 침식 영토 정화 (makeEmpty=true 시 보스 격퇴 후 빈 영토(중립)로 해방!)
+  purifyTerritoriesForBoss(gameState, bossId, makeEmpty = true) {
     this.ensureBossInitialized();
-    const b = this.data.currentBoss;
+    const b = this.findBoss(bossId);
     if (!b || !b.corruptedTerritories || b.corruptedTerritories.length === 0) {
       return [];
     }
@@ -699,18 +811,8 @@ class SeasonManager {
         region.corruptedByBoss = null;
         region.corruptedTheme = null;
 
-        if (entry.prevData && entry.prevData.ownerId && entry.prevData.ownerId !== 'boss') {
-          // 원래 소유자/학급으로 완벽 복원
-          region.ownerId = entry.prevData.ownerId;
-          region.ownerName = entry.prevData.ownerName;
-          region.ownerColor = entry.prevData.ownerColor;
-          region.ownerAvatar = entry.prevData.ownerAvatar;
-          region.capturedBy = entry.prevData.capturedBy;
-          region.capturedById = entry.prevData.capturedById;
-          // 대정화 선물: 무료 방어막 +1 강화 (최소 2단계, 최대 5단계)
-          region.shield = Math.min(5, Math.max(2, (entry.prevData.shield || 1) + 1));
-        } else {
-          // 원래 중립이었던 곳: 중립 상태 복원
+        if (makeEmpty) {
+          // 🌟 보스 퇴치 성공 시: 해당 침식 영토는 완전히 '빈 영토(중립)'로 초기화!
           region.ownerId = null;
           region.ownerName = null;
           region.ownerColor = null;
@@ -718,6 +820,26 @@ class SeasonManager {
           region.capturedBy = null;
           region.capturedById = null;
           region.shield = 0;
+          region.isUnderAttack = false;
+        } else {
+          // 교사 수동 정화 시: 원래 소유팀으로 안전 복원 + 보너스 방어막 +1
+          if (entry.prevData && entry.prevData.ownerId && entry.prevData.ownerId !== 'boss') {
+            region.ownerId = entry.prevData.ownerId;
+            region.ownerName = entry.prevData.ownerName;
+            region.ownerColor = entry.prevData.ownerColor;
+            region.ownerAvatar = entry.prevData.ownerAvatar;
+            region.capturedBy = entry.prevData.capturedBy;
+            region.capturedById = entry.prevData.capturedById;
+            region.shield = Math.min(5, Math.max(2, (entry.prevData.shield || 1) + 1));
+          } else {
+            region.ownerId = null;
+            region.ownerName = null;
+            region.ownerColor = null;
+            region.ownerAvatar = null;
+            region.capturedBy = null;
+            region.capturedById = null;
+            region.shield = 0;
+          }
         }
 
         purifiedList.push(region);
@@ -727,17 +849,30 @@ class SeasonManager {
     const count = b.corruptedTerritories.length;
     b.corruptedTerritories = [];
     this.saveSeasonData();
-    console.log(`✨ [영토 대정화 완료] 잠식되었던 ${count}곳의 모든 영토가 정화되었습니다!`);
+    console.log(`✨ [영토 정화 완료] 보스 [${b.name}]의 ${count}곳 영토 정화 완료 (빈 영토 모드: ${makeEmpty})`);
 
     return purifiedList;
   }
 
-  // 학생: 보스 타격 기록
-  recordBossHit(player, damage = 10, isCrit = false) {
+  // 교사 전체 수동 정화 시: 모든 활성 보스의 잠식 영토 일괄 정화 (기존 소유팀으로 복원)
+  purifyAllTerritories(gameState, makeEmpty = false) {
     this.ensureBossInitialized();
-    const b = this.data.currentBoss;
+    let allPurified = [];
+    (this.data.activeBosses || []).forEach(b => {
+      if (b.corruptedTerritories && b.corruptedTerritories.length > 0) {
+        const list = this.purifyTerritoriesForBoss(gameState, b.bossId, makeEmpty);
+        allPurified = allPurified.concat(list);
+      }
+    });
+    return allPurified;
+  }
 
-    if (b.status !== 'raging' || b.isDefeated) {
+  // 학생: 특정 보스 또는 주 보스 타격 기록
+  recordBossHit(player, damage = 10, isCrit = false, targetBossId = null) {
+    this.ensureBossInitialized();
+    const b = this.findBoss(targetBossId);
+
+    if (!b || b.status !== 'raging' || b.isDefeated) {
       return null;
     }
 
@@ -804,7 +939,7 @@ class SeasonManager {
         defeated: true,
         actualDamage,
         isCrit,
-        boss: this.getBossInfo(),
+        boss: this.getBossInfo(b.bossId),
         mvp,
         winningTeamId,
         rewardBadge: {
@@ -822,7 +957,7 @@ class SeasonManager {
       defeated: false,
       actualDamage,
       isCrit,
-      boss: this.getBossInfo()
+      boss: this.getBossInfo(b.bossId)
     };
   }
 
@@ -888,7 +1023,9 @@ class SeasonManager {
     this.data.lastResetKey = getWeekKey();
 
     // 다음 시즌 신규 보스 세팅
+    this.data.activeBosses = [];
     this.data.currentBoss = this.initBossForSeason(this.data.currentSeason);
+    this.ensureBossInitialized();
     this.ensureAutoSummonSchedule(true);
 
     this.saveSeasonData();

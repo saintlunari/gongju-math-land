@@ -44,6 +44,8 @@ const lockedRegions = {}; // { [regionId]: { unlockTime, regionName, intervalId 
 // [시즌 보스 레이드 전역 상태]
 let currentBossState = null;
 let currentBossQuiz = null;
+let allActiveBosses = [];
+let currentRaidBossId = null;
 let bossStreak = 0;
 let myBossDamageDealt = 0;
 let bossInputMode = 'multiple'; // 'multiple' or 'keypad'
@@ -206,7 +208,7 @@ function initMap() {
   gongjuMap = new window.GongjuMap('map-container', {
     onRegionClick: handleRegionClick,
     onBossClick: (boss) => {
-      enterBossRaid();
+      enterBossRaid(boss);
     }
   });
 
@@ -222,9 +224,11 @@ function handleRegionClick(regionId, regionData) {
   if (reg && (reg.isCorrupted || reg.ownerId === 'boss')) {
     window.soundManager.playWrong();
     const regName = reg.name || '이 마을';
-    const bossName = gongjuMap?.currentBoss?.shortName || gongjuMap?.currentBoss?.name || '거대 보스';
-    if (confirm(`⚠️ [보스 잠식 영토]\n\n[${regName}]은 현재 ${bossName}의 어둠에 잠식되어 있습니다!\n\n일반 퀴즈로는 점령할 수 없으며, 학급 전체가 힘을 모아 보스를 물리쳐야 정화됩니다.\n\n지금 바로 보스 토벌전에 참전하시겠습니까?`)) {
-      enterBossRaid();
+    const bossKey = reg.corruptedByBoss;
+    const boss = allActiveBosses.find(b => b.bossId === bossKey) || gongjuMap?.currentBoss || currentBossState;
+    const bossName = boss?.shortName || boss?.name || '거대 보스';
+    if (confirm(`⚠️ [보스 침식 영토]\n\n[${regName}]은 현재 [${bossName}]의 어둠에 잠식되어 있습니다!\n\n일반 퀴즈로는 점령할 수 없으며, 보스를 물리치면 빈 영토(중립)로 해방되어 누구든 점령할 수 있습니다!\n\n지금 바로 [${bossName}] 토벌전에 참전하시겠습니까?`)) {
+      enterBossRaid(boss);
     }
     return;
   }
@@ -872,22 +876,39 @@ socket.on('season_tick', (seasonInfo) => {
 
 // [시즌 보스 레이드] 보스 소환 이벤트 수신
 socket.on('boss_summoned', (data) => {
-  updateStudentBossBanner(data.boss);
+  if (data.allBosses) {
+    updateStudentBossBanner(data.allBosses.filter(b => b.status === 'raging' && !b.isDefeated));
+  } else if (data.boss) {
+    updateStudentBossBanner(data.boss);
+  }
   updateBossModalUI(data.boss);
   window.soundManager.playBossRoar();
-  showTicker(`⚠️ [긴급] 공주시에 시즌 보스 [${data.boss.icon} ${data.boss.name}] 출현! 협동 토벌전에 참여하세요!`);
+  showTicker(`⚠️ [긴급] 공주시에 전설 보스 [${data.boss.icon} ${data.boss.name}] 출현! 협동 토벌전에 참여하세요!`);
 });
 
 // [시즌 보스 레이드] 보스 피격 동기화
 socket.on('boss_hit', (data) => {
-  updateStudentBossBanner(data);
-  updateBossModalUI(data);
-  const fill = document.getElementById('boss-card-hp-fill');
-  const nums = document.getElementById('boss-card-hp-text');
-  const pct = document.getElementById('boss-card-hp-pct');
-  if (fill) fill.style.width = `${data.hpPercent}%`;
-  if (nums) nums.textContent = `${data.currentHp} / ${data.maxHp} HP`;
-  if (pct) pct.textContent = `${data.hpPercent}%`;
+  if (data.bossId) {
+    const target = allActiveBosses.find(b => b.bossId === data.bossId);
+    if (target) {
+      target.currentHp = data.currentHp;
+      target.hpPercent = data.hpPercent;
+      target.maxHp = data.maxHp;
+      target.lastHitLog = data.lastHitLog;
+      target.topContributors = data.topContributors;
+      target.teamDamage = data.teamDamage;
+    }
+    if (currentRaidBossId === data.bossId) {
+      updateBossModalUI(target || data);
+      const fill = document.getElementById('boss-card-hp-fill');
+      const nums = document.getElementById('boss-card-hp-text');
+      const pct = document.getElementById('boss-card-hp-pct');
+      if (fill) fill.style.width = `${data.hpPercent}%`;
+      if (nums) nums.textContent = `${data.currentHp} / ${data.maxHp} HP`;
+      if (pct) pct.textContent = `${data.hpPercent}%`;
+    }
+  }
+  updateStudentBossBanner(allActiveBosses);
 });
 
 // [시즌 보스 레이드] 보스 퀴즈 수신
@@ -929,7 +950,6 @@ socket.on('boss_attack_result', (data) => {
     window.soundManager.playWrong();
 
     showFeedback(false, () => {
-      // 오답 피드백 완료 후 보기 버튼 및 키패드 재활성화
       document.querySelectorAll('#boss-multiple-options .boss-opt-btn').forEach(btn => {
         btn.disabled = false;
         btn.style.pointerEvents = 'auto';
@@ -950,22 +970,40 @@ socket.on('boss_attack_result', (data) => {
 
 // [시즌 보스 레이드] 보스 토벌 성공 수신
 socket.on('boss_defeated', (data) => {
-  const modal = document.getElementById('boss-raid-modal');
-  if (modal) modal.style.display = 'none';
+  if (data.boss && currentRaidBossId === data.boss.bossId) {
+    const modal = document.getElementById('boss-raid-modal');
+    if (modal) modal.style.display = 'none';
+    currentRaidBossId = null;
+  }
   showStudentBossVictory(data);
-  updateStudentBossBanner(data.boss);
+  // 토벌된 보스 목록에서 제거
+  if (data.boss) {
+    allActiveBosses = allActiveBosses.filter(b => b.bossId !== data.boss.bossId);
+  }
+  updateStudentBossBanner(allActiveBosses);
   showTicker(data.text);
 });
 
 // [시즌 보스 레이드] 보스 중지 수신
 socket.on('boss_dismissed', (data) => {
-  const modal = document.getElementById('boss-raid-modal');
-  if (modal) modal.style.display = 'none';
-  updateStudentBossBanner(data.boss);
+  if (data.bossId) {
+    allActiveBosses = allActiveBosses.filter(b => b.bossId !== data.bossId);
+    if (currentRaidBossId === data.bossId) {
+      const modal = document.getElementById('boss-raid-modal');
+      if (modal) modal.style.display = 'none';
+      currentRaidBossId = null;
+    }
+  } else {
+    allActiveBosses = [];
+    const modal = document.getElementById('boss-raid-modal');
+    if (modal) modal.style.display = 'none';
+    currentRaidBossId = null;
+  }
+  updateStudentBossBanner(allActiveBosses);
   showTicker('🛡️ 보스 토벌전이 일시 종료되었습니다.');
 });
 
-// [보스 영토 침식 및 3시간 자동 소환] 실시간 1초 카운트다운 동기화
+// [보스 영토 침식 및 자동 소환] 실시간 1초 카운트다운 및 보스 현황 동기화
 socket.on('boss_corruption_tick', (data) => {
   const countdownEl = document.getElementById('sbb-countdown-text');
   if (countdownEl && data && typeof data.countdown === 'number') {
@@ -974,9 +1012,14 @@ socket.on('boss_corruption_tick', (data) => {
     countdownEl.textContent = `⏳ 잠식: ${mins}분 ${String(secs).padStart(2, '0')}초`;
   }
 
-  // 3시간 자동 소환 대기 배너 타이머 실시간 갱신
+  // 자동 소환 대기 배너 타이머 실시간 갱신
   if (data) {
     updateStudentAutoSummonTimer(data.autoSummonCountdown, data.autoSummonSettings);
+  }
+
+  // 다중 보스 실시간 동기화
+  if (data && data.activeBosses) {
+    updateStudentBossBanner(data.activeBosses);
   }
 });
 
@@ -984,22 +1027,30 @@ socket.on('boss_corruption_tick', (data) => {
 socket.on('boss_territory_corrupted', (data) => {
   window.soundManager.playBossInvasion();
   triggerStudentInvasionFlash();
-  showTicker(`🚨 [긴급 경보] 보스가 [${data.region.name}]을 잠식했습니다! 협동 토벌전으로 보스를 물리쳐주세요!`);
+  const bossName = data.boss ? (data.boss.shortName || data.boss.name) : '보스';
+  showTicker(`🚨 [긴급 경보] [${bossName}]이(가) [${data.region.name}]을 잠식했습니다! 협동 토벌전으로 물리쳐주세요!`);
 });
 
 // [보스 영토 침식] 방어막 수호 성공 수신
 socket.on('boss_shield_defended', (data) => {
   window.soundManager.playShieldDefend();
-  showTicker(`🛡️ [방어 성공!] [${data.regionName}]의 방어막이 보스의 잠식을 막아냈습니다!`);
+  const bossName = data.boss ? (data.boss.shortName || data.boss.name) : '보스';
+  showTicker(`🛡️ [방어 성공!] [${data.regionName}]의 방어막이 [${bossName}]의 침식을 막아냈습니다!`);
 });
 
-// [보스 영토 침식] 대정화 완료 수신
+// [보스 영토 침식] 영토 정화/해방 완료 수신
 socket.on('boss_territory_purified', (data) => {
   window.soundManager.playPurification();
   if (data.purifiedRegions && data.purifiedRegions.length > 0) {
     gongjuMap.triggerPurifyAnimation(data.purifiedRegions);
   }
-  showTicker(`✨ [영토 대정화 축제] 빼앗겼던 ${data.count || data.purifiedRegions?.length || 0}곳의 모든 땅이 우리 품으로 복구되었습니다!`);
+  const count = data.count || data.purifiedRegions?.length || 0;
+  if (data.isEmptied) {
+    const bName = data.bossName || '보스';
+    showTicker(`✨ [영토 해방] [${bName}]이(가) 토벌되어 침식되었던 ${count}곳의 모든 영토가 빈 영토(중립)로 해방되었습니다! 지금 바로 점령하세요!`);
+  } else {
+    showTicker(`✨ [영토 대정화 축제] 빼앗겼던 ${count}곳의 모든 땅이 원래 소유팀 품으로 복구되었습니다!`);
+  }
 });
 
 // 서버 오류/도전 차단 안내 수신
@@ -1424,7 +1475,13 @@ function initBossRaid() {
   // 참전 버튼
   document.getElementById('btn-enter-boss-raid')?.addEventListener('click', () => {
     window.soundManager.playClick();
-    enterBossRaid();
+    if (allActiveBosses.length > 1) {
+      openBossSelectModal();
+    } else if (allActiveBosses.length === 1) {
+      enterBossRaid(allActiveBosses[0]);
+    } else {
+      enterBossRaid();
+    }
   });
 
   // 닫기 / 후퇴 버튼
@@ -1507,35 +1564,66 @@ function initBossRaid() {
   });
 }
 
-// 상단 보스 배너 UI 및 지도 위 보스 마커 갱신
-function updateStudentBossBanner(boss) {
-  if (!boss) return;
-  currentBossState = boss;
+// 상단 보스 배너 UI 및 지도 위 보스 마커 갱신 (다중 보스 지원)
+function updateStudentBossBanner(bossOrList) {
+  if (!bossOrList) return;
 
-  // 지도 위에 출현 지역 보스 마커 실시간 표시/동기화
+  if (Array.isArray(bossOrList)) {
+    allActiveBosses = bossOrList.filter(b => b && b.status === 'raging' && !b.isDefeated);
+  } else if (typeof bossOrList === 'object') {
+    if (bossOrList.status === 'raging' && !bossOrList.isDefeated) {
+      const idx = allActiveBosses.findIndex(b => b.bossId === bossOrList.bossId);
+      if (idx >= 0) allActiveBosses[idx] = bossOrList;
+      else allActiveBosses.push(bossOrList);
+    } else {
+      allActiveBosses = allActiveBosses.filter(b => b.bossId !== bossOrList.bossId);
+    }
+  }
+
+  const activeCount = allActiveBosses.length;
+  currentBossState = allActiveBosses[0] || null;
+
+  // 지도 위에 모든 출현 보스 마커 실시간 표시/동기화
   if (gongjuMap) {
-    gongjuMap.setBoss(boss);
+    gongjuMap.setBoss(allActiveBosses);
   }
 
   const banner = document.getElementById('student-boss-banner');
   const idleBanner = document.getElementById('student-boss-idle-banner');
 
-  const isRaging = (boss.status === 'raging');
-  if (banner) banner.style.display = isRaging ? 'flex' : 'none';
-  if (idleBanner) idleBanner.style.display = isRaging ? 'none' : 'flex';
+  if (activeCount > 0) {
+    if (banner) banner.style.display = 'flex';
+    if (idleBanner) idleBanner.style.display = 'none';
 
-  if (isRaging) {
     const iconEl = document.getElementById('sbb-icon');
     const titleEl = document.getElementById('sbb-title');
+    const tagEl = document.querySelector('.sbb-tag');
     const fillEl = document.getElementById('sbb-hp-fill');
     const textEl = document.getElementById('sbb-hp-text');
 
-    if (iconEl) iconEl.textContent = boss.icon || '🐉';
-    if (titleEl) titleEl.textContent = boss.name || '시즌 보스';
-    if (fillEl) fillEl.style.width = `${boss.hpPercent || 0}%`;
-    if (textEl) textEl.textContent = `${boss.currentHp} / ${boss.maxHp} HP (${boss.hpPercent}%)`;
+    if (activeCount === 1) {
+      const single = allActiveBosses[0];
+      if (iconEl) iconEl.textContent = single.icon || '🐉';
+      if (tagEl) tagEl.textContent = '⚡ [전설 보스 출현!] PVE 전원 협동 레이드';
+      if (titleEl) titleEl.textContent = single.name || '시즌 보스';
+      if (fillEl) fillEl.style.width = `${single.hpPercent || 0}%`;
+      if (textEl) textEl.textContent = `${single.currentHp} / ${single.maxHp} HP (${single.hpPercent}%)`;
+    } else {
+      if (iconEl) iconEl.textContent = '⚔️';
+      if (tagEl) tagEl.textContent = `⚡ [4대 전설 보스 대격돌!] 총 ${activeCount}마리 동시 출현 중!`;
+      if (titleEl) titleEl.textContent = allActiveBosses.map(b => b.shortName).join(' · ');
+      const totalHp = allActiveBosses.reduce((sum, b) => sum + b.currentHp, 0);
+      const totalMax = allActiveBosses.reduce((sum, b) => sum + b.maxHp, 0);
+      const totalPct = totalMax > 0 ? Math.round((totalHp / totalMax) * 100) : 0;
+      if (fillEl) fillEl.style.width = `${totalPct}%`;
+      if (textEl) textEl.textContent = `총 체력: ${totalHp} / ${totalMax} HP (${totalPct}%)`;
+    }
   } else {
-    updateStudentAutoSummonTimer(boss.nextAutoSummonCountdown, boss.autoSummonSettings);
+    if (banner) banner.style.display = 'none';
+    if (idleBanner) idleBanner.style.display = 'flex';
+    if (currentBossState) {
+      updateStudentAutoSummonTimer(currentBossState.nextAutoSummonCountdown, currentBossState.autoSummonSettings);
+    }
   }
 }
 
@@ -1574,14 +1662,67 @@ function updateBossModalUI(boss) {
   if (pctEl) pctEl.textContent = `${boss.hpPercent || 0}%`;
 }
 
-// 보스 토벌전 입장
-function enterBossRaid() {
+// 보스 선택 모달 열기 (다중 보스 출현 시)
+function openBossSelectModal() {
+  if (allActiveBosses.length === 0) {
+    showTicker('⚔️ 현재 출현 중인 보스가 없습니다.');
+    return;
+  }
+  if (allActiveBosses.length === 1) {
+    enterBossRaid(allActiveBosses[0]);
+    return;
+  }
+
+  const modal = document.getElementById('boss-select-modal');
+  const container = document.getElementById('boss-select-cards-container');
+  if (!modal || !container) return;
+
+  container.innerHTML = allActiveBosses.map(boss => `
+    <div class="boss-select-card" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(139, 92, 246, 0.5); border-radius: 14px; padding: 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <span style="font-size: 2.2rem;">${boss.icon || '🐉'}</span>
+        <div>
+          <div style="font-size: 0.75rem; color: #F472B6; font-weight: 700;">📍 ${boss.location}</div>
+          <div style="font-size: 1rem; font-weight: 800; color: #FFFFFF; margin: 2px 0;">${boss.name}</div>
+          <div style="font-size: 0.75rem; color: #94A3B8;">
+            HP: <b style="color: #38BDF8;">${boss.currentHp}</b> / ${boss.maxHp} (${boss.hpPercent}%) · 잠식: <b style="color: #F87171;">${boss.corruptedCount || 0}곳</b>
+          </div>
+        </div>
+      </div>
+      <button class="btn-select-boss-fight" data-boss-id="${boss.bossId}" style="background: linear-gradient(135deg, #EC4899, #BE185D); color: white; font-weight: 800; font-size: 0.85rem; padding: 8px 14px; border-radius: 10px; border: none; cursor: pointer; white-space: nowrap; box-shadow: 0 4px 10px rgba(236,72,153,0.3);">
+        ⚔️ 참전하기
+      </button>
+    </div>
+  `).join('');
+
+  container.querySelectorAll('.btn-select-boss-fight').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const bId = btn.dataset.bossId;
+      const target = allActiveBosses.find(b => b.bossId === bId);
+      modal.style.display = 'none';
+      if (target) enterBossRaid(target);
+    });
+  });
+
+  modal.style.display = 'flex';
+}
+
+// 보스 토벌전 입장 (특정 보스 지정 가능)
+function enterBossRaid(targetBoss = null) {
+  const boss = targetBoss || (allActiveBosses.length > 0 ? allActiveBosses[0] : currentBossState);
+  if (!boss || boss.status !== 'raging' || boss.isDefeated) {
+    showTicker('⚔️ 현재 진행 중인 보스 토벌전이 없습니다.');
+    return;
+  }
+  currentBossState = boss;
+  currentRaidBossId = boss.bossId;
+
   const modal = document.getElementById('boss-raid-modal');
   if (!modal) return;
-  updateBossModalUI(currentBossState);
+  updateBossModalUI(boss);
   updateBossEraserCount();
   modal.style.display = 'flex';
-  socket.emit('request_boss_quiz');
+  socket.emit('request_boss_quiz', { bossId: currentRaidBossId });
 }
 
 // 지우개 개수 갱신
@@ -1677,6 +1818,7 @@ function submitBossAttackAnswer(chosenVal) {
   }
 
   socket.emit('submit_boss_attack', {
+    bossId: currentRaidBossId,
     quizId: currentBossQuiz.id,
     answer: currentBossQuiz.answer,
     chosenVal,
@@ -1721,8 +1863,8 @@ function showStudentBossVictory(data) {
   if (iconEl && data.boss) iconEl.textContent = data.boss.icon || '🐉';
   if (titleEl && data.boss) titleEl.textContent = `${data.boss.name} 토벌 완료!`;
   if (descEl) {
-    const mvpText = data.mvp ? `시즌 MVP: <b>${data.mvp.name}</b> (${data.mvp.damage} DMG)` : '';
-    descEl.innerHTML = `모든 친구들이 힘을 합쳐 거대 보스를 격퇴했습니다!<br>${mvpText}`;
+    const mvpText = data.mvp ? `<div style="margin-top:8px; font-weight:700; color:#FDE047;">🌟 시즌 MVP: <b>${data.mvp.name}</b> (${data.mvp.damage} DMG)</div>` : '';
+    descEl.innerHTML = `모든 친구들이 힘을 합쳐 <b>${data.boss ? data.boss.name : '거대 보스'}</b>를 격퇴했습니다!<br><span style="color:#4ADE80; font-weight:700; display:inline-block; margin-top:6px;">✨ 잠식되었던 모든 영토가 정화되어 자유로운 빈 영토(중립)로 해방되었습니다! 지금 바로 정복해보세요!</span>${mvpText}`;
   }
   if (data.rewardBadge) {
     if (badgeIcon) badgeIcon.textContent = data.rewardBadge.icon;

@@ -1,6 +1,9 @@
 // 교사용 대시보드 로직
 const socket = io();
 let teacherMap = null;
+let currentBossState = null;
+let allActiveBosses = [];
+let focusedBossId = null;
 
 // 백제 공주 명소 뱃지 메타데이터
 const HERITAGE_BADGES = {
@@ -152,49 +155,72 @@ function initSocket() {
     }
 
     // 시즌 보스 정보 초기 렌더링
-    if (data.boss) {
-      updateBossHUD(data.boss);
+    if (data.allBosses) {
+      allActiveBosses = data.allBosses.filter(b => b.status === 'raging' && !b.isDefeated);
+    } else if (data.boss) {
+      allActiveBosses = (data.boss.status === 'raging' && !data.boss.isDefeated) ? [data.boss] : [];
     }
+    updateBossHUD(allActiveBosses);
+    renderActiveBossesCards();
   });
 
   // 시즌 실시간 틱 동기화 (보스 정보 포함)
   socket.on('season_tick', (seasonInfo) => {
     updateSeasonDisplay(seasonInfo);
-    if (seasonInfo.boss) {
-      updateBossHUD(seasonInfo.boss);
+    if (seasonInfo.allBosses) {
+      allActiveBosses = seasonInfo.allBosses.filter(b => b.status === 'raging' && !b.isDefeated);
     }
+    updateBossHUD(allActiveBosses);
+    renderActiveBossesCards();
   });
 
   // [시즌 보스 레이드] 보스 소환 이벤트 수신
   socket.on('boss_summoned', (data) => {
-    updateBossHUD(data.boss);
+    if (data.allBosses) {
+      allActiveBosses = data.allBosses.filter(b => b.status === 'raging' && !b.isDefeated);
+    } else if (data.boss) {
+      const idx = allActiveBosses.findIndex(b => b.bossId === data.boss.bossId);
+      if (idx >= 0) allActiveBosses[idx] = data.boss;
+      else allActiveBosses.push(data.boss);
+    }
+    focusedBossId = data.boss.bossId;
+    updateBossHUD(allActiveBosses);
+    renderActiveBossesCards();
     window.soundManager.playBossRoar();
     addBattleLog(`⚠️ [긴급 출동] 공주시에 거대 시즌 보스 [${data.boss.icon} ${data.boss.name}] 출현! (HP: ${data.boss.maxHp})`);
   });
 
   // [시즌 보스 레이드] 보스 타격 피격 수신
   socket.on('boss_hit', (data) => {
-    const overlay = document.getElementById('teacher-boss-overlay');
-    const bar = document.getElementById('tb-hp-bar');
-    const nums = document.getElementById('tb-hp-nums');
-    const pct = document.getElementById('tb-hp-pct');
-    const tickerText = document.getElementById('tb-ticker-text');
-
-    if (bar) bar.style.width = `${data.hpPercent}%`;
-    if (nums) nums.textContent = `${data.currentHp} / ${data.maxHp} HP`;
-    if (pct) pct.textContent = `${data.hpPercent}%`;
-
-    const critText = data.isCrit ? ' 🔥 [크리티컬!]' : '';
-    if (tickerText) {
-      tickerText.innerHTML = `💥 <b>[${data.studentName}]</b> 학생의 곱셈 공격! <b>-${data.damage} HP</b>${critText}`;
+    const targetBoss = allActiveBosses.find(b => b.bossId === data.bossId);
+    if (targetBoss) {
+      targetBoss.currentHp = data.currentHp;
+      targetBoss.hpPercent = data.hpPercent;
     }
+    renderActiveBossesCards();
 
-    // 보스 HUD 타격 흔들림 연출
-    if (overlay) {
-      overlay.classList.remove('boss-shake');
-      void overlay.offsetWidth;
-      overlay.classList.add('boss-shake');
-      setTimeout(() => overlay.classList.remove('boss-shake'), 600);
+    if (!focusedBossId || focusedBossId === data.bossId) {
+      const overlay = document.getElementById('teacher-boss-overlay');
+      const bar = document.getElementById('tb-hp-bar');
+      const nums = document.getElementById('tb-hp-nums');
+      const pct = document.getElementById('tb-hp-pct');
+      const tickerText = document.getElementById('tb-ticker-text');
+
+      if (bar) bar.style.width = `${data.hpPercent}%`;
+      if (nums) nums.textContent = `${data.currentHp} / ${data.maxHp} HP`;
+      if (pct) pct.textContent = `${data.hpPercent}%`;
+
+      const critText = data.isCrit ? ' 🔥 [크리티컬!]' : '';
+      if (tickerText) {
+        tickerText.innerHTML = `💥 <b>[${data.studentName}]</b> 학생의 곱셈 공격! <b>-${data.damage} HP</b>${critText}`;
+      }
+
+      if (overlay) {
+        overlay.classList.remove('boss-shake');
+        void overlay.offsetWidth;
+        overlay.classList.add('boss-shake');
+        setTimeout(() => overlay.classList.remove('boss-shake'), 600);
+      }
     }
 
     window.soundManager.playBossHit(data.isCrit);
@@ -211,7 +237,16 @@ function initSocket() {
 
   // [시즌 보스 레이드] 보스 토벌 성공 수신
   socket.on('boss_defeated', (data) => {
-    updateBossHUD(data.boss);
+    if (data.allBosses) {
+      allActiveBosses = data.allBosses.filter(b => b.status === 'raging' && !b.isDefeated);
+    } else if (data.boss) {
+      allActiveBosses = allActiveBosses.filter(b => b.bossId !== data.boss.bossId);
+    }
+    if (focusedBossId === data.boss?.bossId) {
+      focusedBossId = allActiveBosses.length > 0 ? allActiveBosses[0].bossId : null;
+    }
+    updateBossHUD(allActiveBosses);
+    renderActiveBossesCards();
     window.soundManager.playBossVictory();
     showBossDefeatedVictory(data);
     addBattleLog(`🎉 [토벌 대성공] ${data.text}`);
@@ -219,12 +254,30 @@ function initSocket() {
 
   // [시즌 보스 레이드] 보스 중지 수신
   socket.on('boss_dismissed', (data) => {
-    updateBossHUD(data.boss);
-    addBattleLog('🛡️ 교사 권한으로 보스 토벌전이 일시 종료되었습니다.');
+    if (data.allBosses) {
+      allActiveBosses = data.allBosses.filter(b => b.status === 'raging' && !b.isDefeated);
+    } else if (data.bossId) {
+      allActiveBosses = allActiveBosses.filter(b => b.bossId !== data.bossId);
+    } else {
+      allActiveBosses = [];
+    }
+    if (focusedBossId === data.bossId) {
+      focusedBossId = allActiveBosses.length > 0 ? allActiveBosses[0].bossId : null;
+    }
+    updateBossHUD(allActiveBosses);
+    renderActiveBossesCards();
+    addBattleLog(data.bossId ? `🛡️ 교사 권한으로 [${data.boss?.name || '보스'}] 토벌전이 일시 종료되었습니다.` : '🛡️ 교사 권한으로 모든 보스 토벌전이 일시 종료되었습니다.');
   });
 
   // [보스 영토 침식 & 3시간 자동 소환] 실시간 1초 카운트다운 동기화
   socket.on('boss_corruption_tick', (data) => {
+    if (data.activeBosses) {
+      allActiveBosses = data.activeBosses.filter(b => b.status === 'raging' && !b.isDefeated);
+      renderActiveBossesCards();
+    } else if (data.bosses) {
+      allActiveBosses = data.bosses.filter(b => b.status === 'raging' && !b.isDefeated);
+      renderActiveBossesCards();
+    }
     updateCorruptionCountdownUI(data);
     updateAutoSummonCountdownUI(data);
   });
@@ -236,6 +289,13 @@ function initSocket() {
 
   // [보스 영토 침식] 침식 발생 수신
   socket.on('boss_territory_corrupted', (data) => {
+    if (data.boss) {
+      const b = allActiveBosses.find(x => x.bossId === data.boss.bossId);
+      if (b) {
+        b.corruptedCount = data.totalCorrupted || (b.corruptedCount || 0) + 1;
+      }
+      renderActiveBossesCards();
+    }
     window.soundManager.playBossInvasion();
     triggerInvasionFlash();
     addBattleLog(`🚨 [긴급 경보] 보스 [${data.boss?.shortName || '보스'}]이(가) [${data.region.name}]을 잠식했습니다! (잠식: ${data.totalCorrupted}곳)`);
@@ -249,11 +309,19 @@ function initSocket() {
 
   // [보스 영토 침식] 대정화 완료 수신
   socket.on('boss_territory_purified', (data) => {
+    if (data.bossId) {
+      const b = allActiveBosses.find(x => x.bossId === data.bossId);
+      if (b) b.corruptedCount = 0;
+    } else {
+      allActiveBosses.forEach(b => b.corruptedCount = 0);
+    }
+    renderActiveBossesCards();
     window.soundManager.playPurification();
     if (data.purifiedRegions && data.purifiedRegions.length > 0) {
       teacherMap.triggerPurifyAnimation(data.purifiedRegions);
     }
-    addBattleLog(`✨ [영토 대정화] 잠식되었던 ${data.count || data.purifiedRegions?.length || 0}곳의 모든 영토가 황금빛으로 복구되었습니다!`);
+    const purifyText = data.isEmptied ? '빈 영토(중립)로 해방되었습니다!' : '황금빛으로 복구되었습니다!';
+    addBattleLog(`✨ [영토 대정화] 잠식되었던 ${data.count || data.purifiedRegions?.length || 0}곳의 모든 영토가 ${purifyText}`);
   });
 
   // 침식 설정 동기화
@@ -623,7 +691,14 @@ function initControls() {
 
   // [시즌 보스 레이드] 보스 토벌 중지 버튼
   document.getElementById('btn-dismiss-boss')?.addEventListener('click', () => {
-    if (confirm('보스 토벌전을 중지하시겠습니까?')) {
+    if (confirm('현재 출현 중인 모든 보스를 퇴각시키겠습니까?')) {
+      window.soundManager.playClick();
+      socket.emit('teacher_control', { action: 'dismiss_boss' });
+    }
+  });
+
+  document.getElementById('btn-dismiss-all-bosses')?.addEventListener('click', () => {
+    if (confirm('현재 출현 중인 모든 보스를 퇴각시키겠습니까?')) {
       window.soundManager.playClick();
       socket.emit('teacher_control', { action: 'dismiss_boss' });
     }
@@ -782,27 +857,42 @@ function renderHallOfFame(hallOfFame) {
 }
 
 // [시즌 보스 레이드] 교사 화면 보스 HUD 상태 및 지도 위 보스 마커 갱신
-function updateBossHUD(boss) {
-  if (!boss) return;
+function updateBossHUD(bossData) {
+  if (Array.isArray(bossData)) {
+    allActiveBosses = bossData.filter(b => b.status === 'raging' && !b.isDefeated);
+  } else if (bossData) {
+    if (!allActiveBosses.some(b => b.bossId === bossData.bossId)) {
+      if (bossData.status === 'raging' && !bossData.isDefeated) {
+        allActiveBosses.push(bossData);
+      }
+    } else {
+      const idx = allActiveBosses.findIndex(b => b.bossId === bossData.bossId);
+      if (bossData.status === 'raging' && !bossData.isDefeated) {
+        allActiveBosses[idx] = bossData;
+      } else {
+        allActiveBosses.splice(idx, 1);
+      }
+    }
+  }
 
-  // 지도 위에 출현 지역 보스 마커 실시간 표시/동기화
+  // 지도 위에 모든 출현 보스 마커 실시간 표시/동기화
   if (teacherMap) {
-    teacherMap.setBoss(boss);
+    teacherMap.setBoss(allActiveBosses.length > 0 ? allActiveBosses : bossData);
   }
 
   const overlay = document.getElementById('teacher-boss-overlay');
   const badgeState = document.getElementById('teacher-boss-state-badge');
   if (!overlay) return;
 
-  const isRaging = (boss.status === 'raging');
-  overlay.style.display = isRaging ? 'flex' : 'none';
+  const hasRagingBoss = allActiveBosses.length > 0 || (bossData && bossData.status === 'raging' && !bossData.isDefeated);
+  overlay.style.display = hasRagingBoss ? 'flex' : 'none';
 
   if (badgeState) {
-    if (isRaging) {
-      badgeState.textContent = '🔥 토벌전 진행 중!';
+    if (allActiveBosses.length > 0) {
+      badgeState.textContent = `🔥 토벌전 진행 중 (${allActiveBosses.length}마리)`;
       badgeState.style.background = '#EC4899';
       badgeState.style.color = '#FFFFFF';
-    } else if (boss.isDefeated) {
+    } else if (bossData && bossData.isDefeated) {
       badgeState.textContent = '👑 토벌 완료';
       badgeState.style.background = '#10B981';
       badgeState.style.color = '#FFFFFF';
@@ -810,6 +900,38 @@ function updateBossHUD(boss) {
       badgeState.textContent = '대기 중';
       badgeState.style.background = '#334155';
       badgeState.style.color = '#94A3B8';
+    }
+  }
+
+  if (!hasRagingBoss) return;
+
+  // 현재 포커스된 보스 결정
+  if (!focusedBossId || !allActiveBosses.some(b => b.bossId === focusedBossId)) {
+    focusedBossId = allActiveBosses.length > 0 ? allActiveBosses[0].bossId : (bossData?.bossId || null);
+  }
+  const boss = allActiveBosses.find(b => b.bossId === focusedBossId) || (Array.isArray(bossData) ? bossData[0] : bossData);
+  if (!boss) return;
+
+  // 다중 보스 출현 시 상단 탭 렌더링
+  const tabsContainer = document.getElementById('tb-boss-tabs-container');
+  if (tabsContainer) {
+    if (allActiveBosses.length > 1) {
+      tabsContainer.style.display = 'flex';
+      tabsContainer.innerHTML = allActiveBosses.map(b => `
+        <button class="tb-boss-tab-btn" data-boss-id="${b.bossId}" style="background: ${b.bossId === focusedBossId ? 'linear-gradient(135deg, #EC4899, #BE185D)' : '#1E293B'}; color: white; border: 1.5px solid ${b.bossId === focusedBossId ? '#F472B6' : '#475569'}; border-radius: 8px; padding: 5px 12px; font-size: 0.8rem; font-weight: 800; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: ${b.bossId === focusedBossId ? '0 0 10px rgba(236,72,153,0.5)' : 'none'};">
+          <span>${b.icon || '🐉'}</span>
+          <span>${b.shortName || b.name}</span>
+          <span style="font-size: 0.72rem; color: ${b.bossId === focusedBossId ? '#FEF08A' : '#94A3B8'};">(${b.hpPercent || 0}%)</span>
+        </button>
+      `).join('');
+
+      tabsContainer.querySelectorAll('.tb-boss-tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          focusTeacherBoss(btn.dataset.bossId);
+        });
+      });
+    } else {
+      tabsContainer.style.display = 'none';
     }
   }
 
@@ -828,7 +950,7 @@ function updateBossHUD(boss) {
   if (barEl) barEl.style.width = `${boss.hpPercent || 0}%`;
   if (numsEl) numsEl.textContent = `${boss.currentHp || 0} / ${boss.maxHp || 0} HP`;
   if (pctEl) pctEl.textContent = `${boss.hpPercent || 0}%`;
-  if (statusEl) statusEl.textContent = isRaging ? '⚔️ 격전 중!' : (boss.isDefeated ? '👑 토벌 완료' : '대기');
+  if (statusEl) statusEl.textContent = (allActiveBosses.length > 1) ? `⚔️ 격전 중 (${allActiveBosses.length}마리)` : '⚔️ 격전 중!';
 
   // MVP 정보
   if (boss.topContributors && boss.topContributors.length > 0) {
@@ -860,6 +982,114 @@ function updateBossHUD(boss) {
     });
   }
 }
+
+// [시즌 보스 레이드] 현재 출현 중인 보스 카드 목록 렌더링
+function renderActiveBossesCards() {
+  const container = document.getElementById('teacher-active-bosses-list');
+  const countBadge = document.getElementById('teacher-boss-count-badge');
+  if (countBadge) countBadge.textContent = allActiveBosses.length;
+  if (!container) return;
+
+  if (allActiveBosses.length === 0) {
+    container.innerHTML = `<div style="font-size: 0.75rem; color: #64748B; text-align: center; padding: 8px 0;">현재 출현 중인 보스가 없습니다.</div>`;
+    return;
+  }
+
+  container.innerHTML = allActiveBosses.map(boss => {
+    const isFocused = (focusedBossId === boss.bossId);
+    return `
+      <div class="active-boss-card" style="background: ${isFocused ? 'rgba(236,72,153,0.18)' : 'rgba(30,27,75,0.7)'}; border: 1.5px solid ${isFocused ? '#EC4899' : 'rgba(139,92,246,0.4)'}; border-radius: 10px; padding: 8px 10px; display: flex; flex-direction: column; gap: 6px;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div style="display: flex; align-items: center; gap: 8px; cursor: pointer;" onclick="focusTeacherBoss('${boss.bossId}')">
+            <span style="font-size: 1.6rem;">${boss.icon || '🐉'}</span>
+            <div>
+              <div style="font-size: 0.85rem; font-weight: 800; color: #FFFFFF;">${boss.name}</div>
+              <div style="font-size: 0.72rem; color: #F472B6;">📍 ${boss.location}</div>
+            </div>
+          </div>
+          <div style="text-align: right;">
+            <span style="font-size: 0.72rem; background: ${boss.isDefeated ? '#10B981' : '#EC4899'}; color: white; padding: 2px 6px; border-radius: 6px; font-weight: 700;">
+              ${boss.isDefeated ? '토벌완료' : '격전 중'}
+            </span>
+            <div style="font-size: 0.7rem; color: #CBD5E1; margin-top: 2px;">
+              잠식: <b style="color: #F87171;">${boss.corruptedCount || 0}곳</b>
+            </div>
+          </div>
+        </div>
+
+        <!-- 체력바 -->
+        <div style="height: 5px; background: #0F172A; border-radius: 3px; overflow: hidden;">
+          <div style="height: 100%; width: ${boss.hpPercent || 0}%; background: linear-gradient(90deg, #EC4899, #EF4444); transition: width 0.3s;"></div>
+        </div>
+        <div style="display: flex; justify-content: space-between; font-size: 0.7rem; color: #94A3B8;">
+          <span>${boss.currentHp} / ${boss.maxHp} HP</span>
+          <span>${boss.hpPercent || 0}%</span>
+        </div>
+
+        <!-- 개별 제어 버튼 그룹 -->
+        <div style="display: flex; gap: 4px; margin-top: 2px;">
+          <button class="btn-ctrl btn-boss-card-corrupt" data-boss-id="${boss.bossId}" style="flex: 1; background: #4C1D95; color: #DDD6FE; font-size: 0.7rem; padding: 4px; border-radius: 6px; border: 1px solid #7C3AED; cursor: pointer;" title="이 보스의 인접 영토 1곳을 침식시킵니다">
+            ⚠️ 1곳 침식
+          </button>
+          <button class="btn-ctrl btn-boss-card-purify" data-boss-id="${boss.bossId}" style="flex: 1.2; background: #065F46; color: #A7F3D0; font-size: 0.7rem; padding: 4px; border-radius: 6px; border: 1px solid #059669; cursor: pointer;" title="이 보스가 침식한 영토를 복구(정화)합니다">
+            ✨ 영토 정화
+          </button>
+          <button class="btn-ctrl btn-boss-card-dismiss" data-boss-id="${boss.bossId}" style="flex: 0.8; background: #334155; color: #CBD5E1; font-size: 0.7rem; padding: 4px; border-radius: 6px; border: 1px solid #475569; cursor: pointer;" title="이 보스를 퇴각시킵니다">
+            🛡️ 퇴각
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  // 이벤트 바인딩
+  container.querySelectorAll('.btn-boss-card-corrupt').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const bId = btn.dataset.bossId;
+      window.soundManager.playClick();
+      socket.emit('teacher_control', { action: 'trigger_instant_corruption', payload: { bossId: bId } });
+    });
+  });
+
+  container.querySelectorAll('.btn-boss-card-purify').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const bId = btn.dataset.bossId;
+      const b = allActiveBosses.find(x => x.bossId === bId);
+      if (confirm(`✨ [${b?.name || '보스'}]이(가) 잠식한 영토를 정화하시겠습니까?\n(원래 소유팀으로 방어막과 함께 복구됩니다)`)) {
+        window.soundManager.playClick();
+        socket.emit('teacher_control', { action: 'trigger_instant_purification', payload: { bossId: bId } });
+      }
+    });
+  });
+
+  container.querySelectorAll('.btn-boss-card-dismiss').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const bId = btn.dataset.bossId;
+      const b = allActiveBosses.find(x => x.bossId === bId);
+      if (confirm(`🛡️ [${b?.name || '보스'}]을(를) 퇴각(중지)시키겠습니까?`)) {
+        window.soundManager.playClick();
+        socket.emit('teacher_control', { action: 'dismiss_boss', payload: { bossId: bId } });
+      }
+    });
+  });
+}
+
+// 특정 보스 포커스
+function focusTeacherBoss(bossId) {
+  focusedBossId = bossId;
+  const target = allActiveBosses.find(b => b.bossId === bossId);
+  if (target) {
+    updateBossHUD(target);
+    renderActiveBossesCards();
+    if (target.regionId) {
+      teacherMap?.focusRegion(target.regionId, 360);
+    }
+  }
+}
+window.focusTeacherBoss = focusTeacherBoss;
 
 // [시즌 보스 레이드] 보스 토벌 성공 대형 시상 모달
 function showBossDefeatedVictory(data) {
